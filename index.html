@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v16</title>
+<title>Hold'em Coach v17</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -67,7 +67,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v16</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v17</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand">New hand</button></div>
  </div>
  <div class="grid">
@@ -105,7 +105,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
      <div><div class="label">Hero hand</div><strong id="handLabel"></strong></div>
     </div>
    </div>
-   <div id="analysisBox" class="box analysis"><h3>Analysis</h3><div id="analysis"></div></div>
+   <div id="analysisBox" class="box analysis" style="display:none"><div id="analysis"></div></div>
 <div class="box">
  <h3>Ask the Coach</h3>
  <div id="chatMessages" class="chatMessages"><div class="chatBot">Ask ChatGPT about your hand, your decision, or what the other players might have.</div></div>
@@ -478,7 +478,7 @@ function showHandVerdict(){
  }
  coachVisible=true;$("coach").classList.add("show");$("toggleCoach").textContent="Hide coach";
  $("recLabel").textContent="Hand Verdict";$("recommend").textContent=verdict;$("thinking").textContent="Hand complete.";
- $("analysisBox").classList.add("show");let out=outcomeAssessment();$("analysis").innerHTML=analysis+(out?'<div class="rule"></div><div class="label">Outcome</div><div class="recommend">'+out.label+'</div><div style="margin-top:5px">'+out.sentence+'</div>':"");
+ $("analysisBox").classList.remove("show");
 }
 function finishHand(){
  if(handStartStacks.length){
@@ -519,7 +519,7 @@ function showHeroRebuy(){
  ended=true;coachVisible=true;$("coach").classList.add("show");$("toggleCoach").textContent="Hide coach";
  $("recLabel").textContent="Bankroll";$("recommend").textContent="YOU'RE OUT OF CHIPS";
  $("thinking").textContent="You can buy back into the cash game for $200.";
- $("analysisBox").classList.add("show");
+ $("analysisBox").style.display="block";$("analysisBox").classList.add("show");
  $("analysis").innerHTML='<button id="rebuyHero" class="primary">Buy back in for $200</button> <button id="leaveHero">End session</button>';
  setTimeout(()=>{let b=$("rebuyHero");if(b)b.onclick=()=>{players[0].stack=200;heroBusted=false;start()};let l=$("leaveHero");if(l)l.onclick=()=>{$("analysis").textContent="Session ended."}},0);
  $("next").style.display="none";$("actions").style.display="none";
@@ -527,23 +527,72 @@ function showHeroRebuy(){
 
 const CHAT_API="https://holdem-coach-api.lawrence-le.workers.dev/";
 let chatBusy=false,chatTurns=[];
+function streetName(n){return ["Preflop","Flop","Turn","River","Showdown"][n]||"Showdown"}
+function cardsText(cs){return (cs||[]).map(x=>x.r+x.s)}
+function structuredHandHistory(){
+ const streets=["Preflop","Flop","Turn","River"];
+ return streets.map((name,idx)=>{
+  const acts=handActions.filter(a=>a.street===idx).map(a=>({
+   player:names(a.i),position:a.position||null,action:a.type,
+   amount:a.amount||0,streetTotal:a.streetBet||null,
+   potAfter:a.potAfter||null
+  }));
+  let streetBoard=[];
+  if(idx===1)streetBoard=cardsText(board.slice(0,3));
+  if(idx===2)streetBoard=cardsText(board.slice(0,4));
+  if(idx===3)streetBoard=cardsText(board.slice(0,5));
+  return {street:name,board:streetBoard,actions:acts};
+ });
+}
+function decisionToAnalyze(){
+ if(!snapshot)return null;
+ const review=heroReviews[heroReviews.length-1]||{};
+ return {
+  street:streetName(snapshot.street),
+  heroAction:review.action||snapshot.action||null,
+  heroPosition:pos(0),
+  heroCards:cardsText(players[0].cards),
+  boardAtDecision:cardsText(snapshot.board||board),
+  potBeforeDecision:snapshot.pot,
+  amountToCall:snapshot.c,
+  requiredEquity:snapshot.need,
+  rawEquityVsRandomHands:snapshot.e,
+  localHeuristicVerdict:review.verdict||snapshot.verdict||null,
+  warning:"Evaluate this decision using only information available at this point. Do not use later cards or showdown cards to justify the strategy verdict."
+ };
+}
 function chatContext(){
  const hero=players[0];
- const showCards=ended||street===4;
+ const showdown=ended||street===4;
  const seats=players.map((p,i)=>({
   seat:names(i),position:pos(i),stack:p.stack,folded:p.folded,allIn:p.allin,
   committedThisStreet:p.streetBet,
-  ...(i===0||showCards?{cards:(p.cards||[]).map(x=>x.r+x.s)}:{})
+  ...(i===0||showdown?{cards:cardsText(p.cards)}:{})
  }));
  return {
-  handNumber:handNo,street:["Preflop","Flop","Turn","River","Showdown"][street]||"Showdown",
-  heroPosition:pos(0),heroCards:(hero.cards||[]).map(x=>x.r+x.s),
-  board:board.map(x=>x.r+x.s),pot,currentBet,amountToCall:callAmt(0),
-  heroStack:hero.stack,heroHand:hero.cards.length?heroHand():"",
-  players:seats,actionLog:logs.slice(-65),
-  decisions:heroReviews.map(r=>({street:r.street,action:r.action,verdict:r.verdict,analysis:r.analysis})),
-  ...(snapshot?{lastDecision:{street:snapshot.street,action:snapshot.action,verdict:snapshot.verdict,analysis:snapshot.analysis,rawRandomEquity:snapshot.e,requiredEquity:snapshot.need}}:{}),
-  note:"Game's heuristic verdicts and random-hand equity may be wrong; use actual betting action and cards."
+  handNumber:handNo,
+  currentStreet:streetName(street),
+  hero:{position:pos(0),cards:cardsText(hero.cards),stack:hero.stack,hand:hero.cards.length?heroHand():""},
+  currentBoard:cardsText(board),
+  currentPot:pot,currentBet,amountToCall:callAmt(0),
+  players:seats,
+  handHistoryByStreet:structuredHandHistory(),
+  decisionToAnalyze:decisionToAnalyze(),
+  heroDecisionReviews:heroReviews.map(r=>({street:streetName(r.street),action:r.action,localVerdict:r.verdict})),
+  showdown:showdown?{
+   board:cardsText(board),
+   revealedHands:players.filter(p=>p.cards&&p.cards.length===2).map((p,i)=>({player:names(players.indexOf(p)),cards:cardsText(p.cards),folded:p.folded})),
+   note:"Showdown cards are hindsight only. On the river, there are no future cards left to come."
+  }:null,
+  chronologicalLog:logs.slice(-80),
+  interpretationRules:[
+   "Raw equity is against random hands, not an action-inferred opponent range.",
+   "For strategy evaluation, freeze information at the decision point.",
+   "Use showdown cards only for hindsight: what opponent actually had.",
+   "Never describe a player as getting lucky after a river decision; all community cards are already dealt.",
+   "Read board rank hierarchy carefully: on A-J-6, an ace is top pair and a jack is second pair.",
+   "The game's local heuristic verdict may be wrong; reason from cards, positions, betting sequence, pot and price."
+  ]
  };
 }
 function addChatMessage(role,message){

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v11</title>
+<title>Hold'em Coach v12</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -34,7 +34,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v11</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v12</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand">New hand</button></div>
  </div>
  <div class="grid">
@@ -201,17 +201,77 @@ function postClass(d){
  if(e>=35)return {rec:"Check / selective bluff",quality:"drawing or marginal",confidence:"low",why:"You retain useful raw equity, but bluffing requires fold equity, blockers, or range advantage."};
  return {rec:"Check often",quality:"weak",confidence:"medium",why:"With little showdown value, checking is the default unless the board strongly favors your range."};
 }
+
+function money(n){return "$"+Math.round(n)}
+function coachVoicePost(d,pc){
+ let rel=heroBoardRelation(),ap=actionPressure(),call=d.c,hn=heroHand().toLowerCase();
+ if(call&&pc.quality==="range-aware fold"){
+  if(rel.pocket&&rel.boardOver)return "I don't like this spot. The overcard is already bad for your pocket pair, and the action in front of you makes it worse. I'd let this go.";
+  if(ap.calls)return "This is getting too strong in front of us. A bet is one thing; a bet plus a caller is another. I wouldn't pay to find out.";
+  return "They're showing a lot of strength here. Your hand has some equity, but not enough that I want to get stubborn with it.";
+ }
+ if(call&&pc.quality==="clear continue")return "I think we're still good often enough. The price is reasonable and nobody has shown enough strength to scare me off. I'd continue.";
+ if(call&&pc.quality==="thin continue")return "This one's close. We're getting just enough of a price to continue, but I wouldn't love facing more heat.";
+ if(call&&pc.quality==="close fold")return "Pretty close, but I lean fold. We don't have enough cushion to justify forcing it.";
+ if(call&&pc.quality==="clear fold")return "Easy enough fold for me. We're just not getting the right price.";
+ if(!call&&pc.quality==="strong value")return "We've got a real hand here. I'd start getting value rather than giving everyone a free card.";
+ if(!call&&pc.quality==="medium-strength")return "We're in decent shape, but this isn't a hand I want to build a huge pot with automatically. Betting and checking can both make sense.";
+ if(!call&&pc.quality==="drawing or marginal")return "We have something to work with, but not enough to force the action. I'd usually keep the pot manageable unless there's a good reason to bluff.";
+ return "Not much reason to put money in right now. I'd check and see what develops.";
+}
+function coachVoicePre(pc){
+ if(pc.rec==="Raise"&&pc.grade==="strong")return "Strong hand. Let's put money in and make worse hands pay.";
+ if(pc.rec==="Raise")return "This is good enough to open from here. I'd raise.";
+ if(pc.rec==="Call")return "I don't want to fold this, but I don't need to blow the pot up either. Calling looks good.";
+ if(pc.rec==="Fold")return "I wouldn't get involved with this one from here. Just let it go.";
+ return "Nothing to do here. Take the free card.";
+}
+function actionAnalysis(type,pc,d){
+ let rel=street?heroBoardRelation():null, ap=street?actionPressure():null;
+ if(street===0){
+  if(type==="fold"&&pc.rec==="Fold")return "Good. No need to manufacture a hand from a bad starting spot.";
+  if(type==="raise"&&pc.rec==="Raise")return pc.grade==="strong"?"Good. That's exactly the kind of hand we want to build a pot with.":"Good open. This hand is strong enough from your position.";
+  if(type==="call"&&pc.rec==="Call")return "Good. You stayed in without turning a medium hand into a big pot.";
+  if(type==="fold"&&(pc.rec==="Raise"||pc.rec==="Call"))return "A little too cautious. This hand was good enough to keep playing.";
+  if(type==="call"&&pc.rec==="Raise")return "Playable, but I'd rather take the initiative here.";
+  if(type==="raise"&&pc.rec==="Call")return "That's more aggression than this hand really needs.";
+  return "That line is looser than I'd like from this position.";
+ }
+ if(type==="fold"){
+  if(pc.quality==="range-aware fold"){
+   if(rel&&rel.pocket&&rel.boardOver)return "Good fold. Pocket pairs are hard to release, but once the board beats your pair and multiple players show strength, you don't need to be a hero.";
+   if(ap&&ap.calls)return "Good fold. The caller matters here — you're not just trying to beat the bettor anymore.";
+   return "Good fold. There was enough strength in front of you that hanging on would be expensive.";
+  }
+  if(pc.quality==="clear fold")return "Good fold. The price just wasn't there.";
+  if(pc.quality==="close fold")return "Fine fold. It was close enough that I wouldn't lose sleep over it.";
+  return "I think that's a little too cautious. We had enough going for us to continue.";
+ }
+ if(type==="call"){
+  if(pc.quality==="range-aware fold")return "I think that's a call we can save next time. The action was telling us we're probably behind.";
+  if(pc.quality==="clear continue")return "Good call. We're ahead of the price often enough and the action isn't especially alarming.";
+  if(pc.quality==="thin continue")return "Reasonable call. It's close, so I wouldn't treat this as an automatic continue every time.";
+  if(pc.quality==="close fold")return "A little sticky. It's not a disaster, but folding is cleaner here.";
+  return "Too loose. We're paying too much for what this hand is worth.";
+ }
+ if(type==="check"){
+  if(pc.quality==="strong value")return "I'd rather bet. There are worse hands that can pay us, and checking gives up that chance.";
+  return "Good check. No need to force the pot bigger.";
+ }
+ if(type==="raise"){
+  if(pc.quality==="strong value")return "Good. We have a hand that wants more money in the pot.";
+  if(pc.quality==="medium-strength")return "That's defensible, but be careful about getting called or raised — we're not at the top of our range.";
+  if(pc.quality==="drawing or marginal")return "This can work as pressure, but now we're relying on folds as much as our actual hand.";
+  return "That's ambitious. Without much hand strength, we need them to fold a lot for this to work.";
+ }
+ return "";
+}
 function coachData(){
  let ccall=callAmt(0),need=ccall?100*ccall/(pot+ccall):0,e=estimateEquity(),p=pos(0),txt="",rec="",quality="",why="";
  if(street===0){
-  let pc=preClass();quality=pc.grade;rec=pc.rec;why=pc.why;
-  txt="You are "+p+" with "+pc.h+". "+pc.why;
-  if(currentBet>2)txt+=" You are facing a raise to $"+currentBet+".";
+  let pc=preClass();quality=pc.grade;rec=pc.rec;why=pc.why;txt=coachVoicePre(pc);
  } else {
-  let base={c:ccall,need,e},pc=postClass(base);quality=pc.quality;rec=pc.rec;why=pc.why;
-  let hn=heroHand(),tex=boardTexture(),ap=actionPressure();
-  txt="You have "+hn.toLowerCase()+" on a "+tex+" board in a "+live().length+"-way pot. "+pc.why+(ap.raises||ap.calls?" Public action: "+ap.raises+" bet/raise(s), "+ap.calls+" call(s) this street.":"");
-  if(live().length>2)txt+=" Multiway action makes marginal value bets and bluffs less attractive.";
+  let base={c:ccall,need,e},pc=postClass(base);quality=pc.quality;rec=pc.rec;why=pc.why;txt=coachVoicePost(base,pc);
  }
  return {c:ccall,need,e,p,txt,rec,quality,why,finalPot:pot+ccall,hand:heroHand(),live:live().length,street:["Preflop","Flop","Turn","River"][street]};
 }
@@ -318,28 +378,28 @@ function review(type,d){
    else {verdict="BLUFF MAY BE TOO AMBITIOUS";analysis="With low estimated equity, this bet relies heavily on opponents folding. Against calling-heavy ranges it is likely a mistake.";severity="minor"}
   }
  }
- snapshot={...d,verdict,analysis,severity,action:actionName};heroReviews.push({verdict,analysis,severity,action:actionName,street:d.street,e:d.e,need:d.need});paused=true;coachVisible=true;$("toggleCoach").textContent="Hide coach";$("continue").style.display="inline-block";render()
+ analysis=actionAnalysis(type,street===0?preClass():postClass(d),d);snapshot={...d,verdict,analysis,severity,action:actionName};heroReviews.push({verdict,analysis,severity,action:actionName,street:d.street,e:d.e,need:d.need});paused=true;coachVisible=true;$("toggleCoach").textContent="Hide coach";$("continue").style.display="inline-block";render()
 }
 function heroAction(type,target=0){let d=coachData();commit(0,type,target);review(type,d)}
 function showdownReviewNote(){
  if(street!==4||!heroReviews.length)return "";
  let opp=players.map((p,i)=>i!==0&&p.cards&&p.cards.length===2&&!p.folded?i:-1).filter(i=>i>=0);
  if(!opp.length)return "";
- let revealed=opp.map(i=>names(i)+" showed "+canonHand(players[i].cards)).join(", ");
- return " Showdown context (not used for the original decision): "+revealed+".";
+ let revealed=opp.map(i=>names(i)+" had "+canonHand(players[i].cards)).join(" and ");
+ return " At showdown, "+revealed+".";
 }
 function showHandVerdict(){
  let verdict,analysis;
- if(!heroReviews.length){verdict="NO MEANINGFUL DECISION";analysis="The hand ended before you faced a substantive decision."}
+ if(!heroReviews.length){verdict="NOT MUCH TO REVIEW";analysis="You never really had a decision in this one."}
  else{
   let major=heroReviews.filter(r=>r.severity==="major"),minor=heroReviews.filter(r=>r.severity==="minor"),close=heroReviews.filter(r=>r.severity==="close"),good=heroReviews.filter(r=>r.severity==="good");
-  if(!major.length&&!minor.length&&!close.length){verdict="VERY WELL PLAYED";analysis="The coach did not flag a meaningful mistake across "+heroReviews.length+" decision"+(heroReviews.length===1?"":"s")+"."}
-  else if(!major.length&&!minor.length&&close.length){verdict="SOLID HAND — SOME CLOSE SPOTS";analysis="Your line was fundamentally sound. "+close.length+" decision"+(close.length===1?" was":"s were")+" close enough that reasonable range assumptions could change the preferred action."}
-  else if(!major.length&&minor.length===1){verdict="GOOD HAND WITH ONE SMALL LEAK";analysis=minor[0].street+": "+minor[0].verdict+". "+minor[0].analysis}
-  else if(!major.length){verdict="MOSTLY SOUND, BUT TOO MANY MARGINAL LEAKS";analysis="No major error was flagged, but "+minor.length+" decision"+(minor.length===1?"":"s")+" could be improved. "+minor.slice(0,2).map(r=>r.street+": "+r.verdict).join("; ")+". "}
-  else if(major.length===1&&good.length){verdict="ONE COSTLY DECISION IN AN OTHERWISE SOLID HAND";analysis=major[0].street+": "+major[0].verdict+". "+major[0].analysis}
-  else if(major.length===1){verdict="ONE CLEAR MISTAKE";analysis=major[0].street+": "+major[0].verdict+". "+major[0].analysis}
-  else {verdict="SEVERAL DECISIONS NEED WORK";analysis=major.slice(0,3).map(r=>r.street+": "+r.verdict+" — "+r.analysis).join(" ")}
+  if(!major.length&&!minor.length&&!close.length){verdict="VERY WELL PLAYED";analysis="Clean hand. I wouldn't change anything important."}
+  else if(!major.length&&!minor.length&&close.length){verdict="SOLID HAND";analysis="You handled the important spots well. A couple decisions were close, but nothing stands out as a mistake."}
+  else if(!major.length&&minor.length===1){verdict="GOOD HAND WITH ONE SMALL LEAK";analysis=minor[0].analysis}
+  else if(!major.length){verdict="MOSTLY GOOD";analysis="Nothing disastrous, but there are a few spots where you're giving away a little value. The biggest one: "+minor[0].analysis}
+  else if(major.length===1&&good.length){verdict="MOSTLY GOOD — ONE MISTAKE";analysis=major[0].analysis}
+  else if(major.length===1){verdict="ONE THING TO FIX";analysis=major[0].analysis}
+  else {verdict="A ROUGH HAND";analysis="There were a couple spots I'd play differently. Most important: "+major[0].analysis}
  }
  coachVisible=true;$("coach").classList.add("show");$("toggleCoach").textContent="Hide coach";
  $("recLabel").textContent="Hand Verdict";$("recommend").textContent=verdict;$("thinking").textContent="Hand complete.";

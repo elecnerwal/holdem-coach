@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v20</title>
+<title>Hold'em Coach v21</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -67,7 +67,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v20</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v21</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand">New hand</button></div>
  </div>
  <div class="grid">
@@ -118,7 +118,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <script>
 (()=>{
 const $=id=>document.getElementById(id), ranks="23456789TJQKA".split(""), suits=["♠","♥","♦","♣"];
-let deck=[], players=[], board=[], button=-1, street=0, pot=0, currentBet=0, minRaise=2, actor=0, acted=new Set(), paused=false, ended=false, coachVisible=false, logs=[], snapshot=null, handNo=0, handStartStacks=[], handHistory=[], heroReviews=[], botRebuys=Array(10).fill(0), heroBusted=false, streetActions=[], handActions=[], botTimer=null, lastShowdown=null;
+let deck=[], players=[], board=[], button=-1, street=0, pot=0, currentBet=0, minRaise=2, actor=0, acted=new Set(), paused=false, ended=false, coachVisible=false, logs=[], snapshot=null, handNo=0, handStartStacks=[], handHistory=[], heroReviews=[], botRebuys=Array(10).fill(0), heroBusted=false, streetActions=[], handActions=[], botTimer=null, lastShowdown=null, gptVerdictBusy=false;
 const BOT_STYLES=[null,"TAG","Calling Station","Nit","LAG","Beginner","TAG","Strong Reg","Calling Station","Nit"];
 const BOT_ACTION_DELAY=850, STREET_DELAY=1150;
 const STYLE={"TAG":{loose:0,aggr:.12,sticky:0},"Calling Station":{loose:2,aggr:-.12,sticky:.20},"Nit":{loose:-2,aggr:-.08,sticky:-.20},"LAG":{loose:3,aggr:.28,sticky:.05},"Beginner":{loose:1,aggr:.02,sticky:.08},"Strong Reg":{loose:0,aggr:.16,sticky:-.04}};
@@ -428,7 +428,7 @@ function review(type,d){
    else {verdict="BLUFF MAY BE TOO AMBITIOUS";analysis="With low estimated equity, this bet relies heavily on opponents folding. Against calling-heavy ranges it is likely a mistake.";severity="minor"}
   }
  }
- analysis=actionAnalysis(type,street===0?preClass():postClass(d),d);snapshot={...d,verdict,analysis,severity,action:actionName};heroReviews.push({verdict,analysis,severity,action:actionName,street:d.street,e:d.e,need:d.need});paused=true;coachVisible=true;$("toggleCoach").textContent="Hide coach";$("continue").style.display="inline-block";render()
+ analysis=actionAnalysis(type,street===0?preClass():postClass(d),d);snapshot={...d,verdict,analysis,severity,action:actionName};heroReviews.push({verdict,analysis,severity,action:actionName,street:d.street,e:d.e,need:d.need});paused=true;coachVisible=true;$("toggleCoach").textContent="Hide coach";$("continue").style.display="inline-block";render();getGPTVerdict(d,type)
 }
 function heroAction(type,target=0){let d=coachData();commit(0,type,target);review(type,d)}
 
@@ -516,7 +516,7 @@ function start(){
  let next=active.find(i=>i>button);button=next===undefined?active[0]:next;
  shuffle();players=[];
  for(let i=0;i<10;i++){let out=oldStacks[i]<=0;players.push({cards:out?[]:[draw(),draw()],stack:oldStacks[i],streetBet:0,folded:out,allin:false,action:out?"OUT":"",style:BOT_STYLES[i]||"Hero"})}
- board=[];street=0;pot=0;currentBet=0;lastShowdown=null;minRaise=2;acted=new Set();streetActions=[];handActions=[];paused=false;ended=false;coachVisible=false;snapshot=null;logs=[];heroReviews=[];handNo++;handStartStacks=players.map(p=>p.stack);
+ board=[];street=0;pot=0;currentBet=0;lastShowdown=null;gptVerdictBusy=false;minRaise=2;acted=new Set();streetActions=[];handActions=[];paused=false;ended=false;coachVisible=false;snapshot=null;logs=[];heroReviews=[];handNo++;handStartStacks=players.map(p=>p.stack);
  $("continue").style.display="none";$("next").style.display="none";$("sizes").classList.remove("show");$("toggleCoach").textContent="Show coach";
  let order=clockwiseActive(button),sb,bb;
  if(active.length===2){sb=button;bb=order[0]}else{sb=order[0];bb=order[1]}
@@ -572,7 +572,7 @@ function decisionToAnalyze(){
   warning:"Evaluate this decision using only information available at this point. Do not use later cards or showdown cards to justify the strategy verdict."
  };
 }
-function chatContext(){
+function chatContext(mode="chat",decisionOverride=null){
  const hero=players[0];
  const showdown=ended||street===4;
  const seats=players.map((p,i)=>({
@@ -588,7 +588,8 @@ function chatContext(){
   currentPot:pot,currentBet,amountToCall:callAmt(0),
   players:seats,
   handHistoryByStreet:structuredHandHistory(),
-  decisionToAnalyze:decisionToAnalyze(),
+  requestMode:mode,
+  decisionToAnalyze:decisionOverride||decisionToAnalyze(),
   heroDecisionReviews:heroReviews.map(r=>({street:streetName(r.street),action:r.action,localVerdict:r.verdict})),
   showdown:showdown?{
    authoritativeResult:lastShowdown,
@@ -606,6 +607,38 @@ function chatContext(){
    "The game's local heuristic verdict may be wrong; reason from cards, positions, betting sequence, pot and price."
   ]
  };
+}
+async function getGPTVerdict(d,type){
+ const actionName=type==="raise"?(d.c?"Raise":"Bet"):type==="call"?(d.c?"Call":"Check"):type==="fold"?"Fold":"Check";
+ const decision={
+  street:streetName(d.street),heroAction:actionName,heroPosition:d.position,
+  heroCards:cardsText(players[0].cards),boardAtDecision:cardsText(d.board),
+  potBeforeDecision:d.pot,amountToCall:d.c,requiredEquity:d.need,
+  rawEquityVsRandomHands:d.e,
+  warning:"Grade only this decision using information available at this moment. Raw equity is versus random hands. Identify made hands and draws correctly."
+ };
+ gptVerdictBusy=true;
+ $("recLabel").textContent="Verdict";
+ $("recommend").textContent="ChatGPT is reviewing…";
+ $("thinking").textContent="Analyzing the decision in context.";
+ render();
+ try{
+  const response=await fetch(CHAT_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+   question:"Grade my most recent poker decision. Return a concise verdict first (for example GOOD CALL, GOOD FOLD, TOO LOOSE, TOO TIGHT, CLOSE DECISION), then 1–3 short sentences explaining why. Focus on actual made hand, draws, pot odds, position, opponents' action and plausible ranges. Do not recap the whole hand.",
+   context:chatContext("automatic_decision_verdict",decision)
+  })});
+  const data=await response.json();
+  if(!response.ok||!data.answer)throw Error(data.details||data.error||"No verdict");
+  let text=data.answer.trim(),parts=text.split(/\n+/),first=parts.shift().replace(/^\*+|\*+$/g,"").replace(/^Conclusion:\s*/i,"").trim();
+  if(first.length>65){first="CHATGPT VERDICT";parts.unshift(text)}
+  $("recommend").textContent=first.toUpperCase();
+  $("thinking").textContent=parts.join(" ").trim()||text;
+  if(snapshot){snapshot.verdict=first;snapshot.analysis=text}
+  if(heroReviews.length){let rr=heroReviews[heroReviews.length-1];rr.verdict=first;rr.analysis=text;rr.severity="gpt"}
+ }catch(err){
+  $("recommend").textContent="COACH UNAVAILABLE";
+  $("thinking").textContent="ChatGPT couldn't grade this decision. The decision math is still shown below.";
+ }finally{gptVerdictBusy=false;render()}
 }
 function addChatMessage(role,message){
  const m=$("chatMessages"),el=document.createElement("div");
@@ -658,7 +691,7 @@ $("customRaise").onclick=()=>{
   $("sizes").classList.remove("show");
   heroAction("raise",target);
 };
-$("continue").onclick=()=>{paused=false;coachVisible=false;$("toggleCoach").textContent="Show coach";$("continue").style.display="none";afterHero()};
+$("continue").onclick=()=>{if(gptVerdictBusy)return;paused=false;coachVisible=false;$("toggleCoach").textContent="Show coach";$("continue").style.display="none";afterHero()};
 start();
 })();
 </script>

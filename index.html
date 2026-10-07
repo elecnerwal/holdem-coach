@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v33</title>
+<title>Hold'em Coach v34</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -67,7 +67,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v33</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v34</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand">New hand</button></div>
  </div>
  <div class="grid">
@@ -125,6 +125,28 @@ const BOT_ACTION_DELAY=850, STREET_DELAY=1150;
 let gptRecommendationBusy=false,gptRecommendationKey="",gptRecommendation=null;
 const STYLE={"TAG":{loose:0,aggr:.12,sticky:0},"Calling Station":{loose:2,aggr:-.12,sticky:.20},"Nit":{loose:-2,aggr:-.08,sticky:-.20},"LAG":{loose:3,aggr:.28,sticky:.05},"Beginner":{loose:1,aggr:.02,sticky:.08},"Strong Reg":{loose:0,aggr:.16,sticky:-.04}};
 const rv=r=>ranks.indexOf(r)+2, names=i=>i===0?"YOU":"P"+(i+1);
+let audioCtx=null,audioEnabled=false;
+function audio(){
+ if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+ if(audioCtx.state==="suspended")audioCtx.resume();
+ return audioCtx;
+}
+function unlockAudio(){try{audio();audioEnabled=true}catch(e){}}
+document.addEventListener("pointerdown",unlockAudio,{once:true});
+document.addEventListener("keydown",unlockAudio,{once:true});
+function noiseBurst(duration=.05,volume=.05,highpass=700){
+ if(!audioEnabled)return;let ac=audio(),n=Math.max(1,Math.floor(ac.sampleRate*duration)),buf=ac.createBuffer(1,n,ac.sampleRate),d=buf.getChannelData(0);
+ for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);
+ let src=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();src.buffer=buf;f.type="highpass";f.frequency.value=highpass;g.gain.value=volume;src.connect(f).connect(g).connect(ac.destination);src.start();
+}
+function chipSound(){
+ if(!audioEnabled)return;let ac=audio(),now=ac.currentTime;
+ [0,.035,.07].forEach((dt,k)=>{let o=ac.createOscillator(),g=ac.createGain();o.type="sine";o.frequency.setValueAtTime(1250+k*230,now+dt);o.frequency.exponentialRampToValueAtTime(650+k*90,now+dt+.045);g.gain.setValueAtTime(.0001,now+dt);g.gain.exponentialRampToValueAtTime(.055,now+dt+.004);g.gain.exponentialRampToValueAtTime(.0001,now+dt+.055);o.connect(g).connect(ac.destination);o.start(now+dt);o.stop(now+dt+.06)});noiseBurst(.11,.035,1200);
+}
+function foldSound(){if(!audioEnabled)return;noiseBurst(.11,.075,450)}
+function dealSound(count=1){
+ if(!audioEnabled)return;for(let k=0;k<count;k++)setTimeout(()=>noiseBurst(.055,.065,900),k*65);
+}
 function shuffle(){deck=[];for(const r of ranks)for(const s of suits)deck.push({r,s});for(let i=deck.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[deck[i],deck[j]]=[deck[j],deck[i]]}}
 function draw(){return deck.pop()}
 function activeSeatIds(){return players.map((p,i)=>p&&p.stack>0?i:-1).filter(i=>i>=0)}
@@ -365,7 +387,7 @@ function renderCoach(){if(ended){showHandVerdict();return}if(paused&&snapshot){$
  else {let d=coachData();$("recLabel").textContent="Recommendation";$("position").textContent=d.p;$("startingStrength").textContent=d.startingStrength?(d.handStrength?d.handStrength.percent.toFixed(1)+"%":"—"):"—";$("equity").textContent=d.e.toFixed(0)+"%";$("needed").textContent=d.c?d.need.toFixed(1)+"%":"—";$("price").textContent="$"+d.c;$("afterPot").textContent="$"+d.finalPot;$("playersLive").textContent=d.live;$("handLabel").textContent=d.hand;$("analysisBox").classList.remove("show");let key=recommendationKey(d);if(gptRecommendation&&gptRecommendationKey===key){$("recommend").textContent=gptRecommendation.verdict;$("thinking").textContent=gptRecommendation.analysis}else{$("recommend").textContent="ChatGPT is reviewing…";$("thinking").textContent="Analyzing the current decision.";requestGPTRecommendation(d,key)}}}
 function render(){for(let i=0;i<10;i++){let el=i===0?$("hero"):$("seat"+i);el.innerHTML=seatHTML(i);el.classList.toggle("turn",!ended&&!paused&&actor===i);el.classList.toggle("folded",players[i].folded)}$("street").textContent=["Preflop","Flop","Turn","River","Showdown"][street];$("pot").textContent="$"+pot;$("turn").textContent=ended?"Hand complete":paused?"Paused — review your decision":`${names(actor)} to act · ${pos(actor)}`;$("board").innerHTML=board.map(c=>card(c,false)).join("")+Array(5-board.length).fill('<div class="card" style="opacity:.12">?</div>').join("");$("history").innerHTML=logs.map(x=>"<div>"+x+"</div>").join("");$("history").scrollTop=$("history").scrollHeight;$("engineState").textContent=ended?"Hand finished":paused?"Waiting for Continue":("Next: "+names(actor)+" · "+pos(actor));let ht=actor===0&&!paused&&!ended;$("actions").style.display=ht?"flex":"none";let c=callAmt(0);$("checkCall").textContent=c?`Call $${c}`:"Check";$("fold").disabled=!c;$("raise").textContent=currentBet?"Raise":"Bet";$("coach").classList.toggle("show",coachVisible);$("skipEnd").style.display=(!ended&&players[0].folded)?"inline-block":"none";if(players[0].cards.length)renderCoach()}
 function log(x){logs.push(x)}
-function commit(i,type,target=0){let p=players[i],c=callAmt(i),potBefore=pot,betBefore=currentBet,position=pos(i),fromBet=p.streetBet;if(type==="fold"){p.folded=true;p.action="Fold";acted.add(i);streetActions.push({i,type:"fold",amount:0,potBefore,betBefore,fromBet,toBet:fromBet,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} folds.`);return}if(type==="check"){p.action="Check";acted.add(i);streetActions.push({i,type:"check",amount:0,potBefore,betBefore,fromBet,toBet:fromBet,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} checks.`);return}if(type==="call"){let pay=Math.min(c,p.stack);p.stack-=pay;p.streetBet+=pay;pot+=pay;p.action=`Call ${pay}`;if(!p.stack)p.allin=true;acted.add(i);streetActions.push({i,type:"call",amount:pay,potBefore,betBefore,fromBet,toBet:p.streetBet,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} calls ${pay}.`);return}if(type==="raise"){target=Math.min(target,p.streetBet+p.stack);let old=currentBet,pay=target-p.streetBet;p.stack-=pay;p.streetBet=target;pot+=pay;currentBet=target;minRaise=Math.max(2,target-old);p.action=(old?`Raise to $${target}`:`Bet $${target}`);if(!p.stack)p.allin=true;acted=new Set([i]);streetActions.push({i,type:"raise",amount:pay,target,potBefore,betBefore,fromBet,toBet:target,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} ${p.action.toLowerCase()}.`)}}
+function commit(i,type,target=0){let p=players[i],c=callAmt(i),potBefore=pot,betBefore=currentBet,position=pos(i),fromBet=p.streetBet;if(type==="fold"){foldSound();p.folded=true;p.action="Fold";acted.add(i);streetActions.push({i,type:"fold",amount:0,potBefore,betBefore,fromBet,toBet:fromBet,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} folds.`);return}if(type==="check"){p.action="Check";acted.add(i);streetActions.push({i,type:"check",amount:0,potBefore,betBefore,fromBet,toBet:fromBet,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} checks.`);return}if(type==="call"){chipSound();let pay=Math.min(c,p.stack);p.stack-=pay;p.streetBet+=pay;pot+=pay;p.action=`Call ${pay}`;if(!p.stack)p.allin=true;acted.add(i);streetActions.push({i,type:"call",amount:pay,potBefore,betBefore,fromBet,toBet:p.streetBet,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} calls ${pay}.`);return}if(type==="raise"){chipSound();target=Math.min(target,p.streetBet+p.stack);let old=currentBet,pay=target-p.streetBet;p.stack-=pay;p.streetBet=target;pot+=pay;currentBet=target;minRaise=Math.max(2,target-old);p.action=(old?`Raise to $${target}`:`Bet $${target}`);if(!p.stack)p.allin=true;acted=new Set([i]);streetActions.push({i,type:"raise",amount:pay,target,potBefore,betBefore,fromBet,toBet:target,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} ${p.action.toLowerCase()}.`)}}
 function complete(){
  let a=actionable();
  if(a.length===0)return true;
@@ -373,14 +395,14 @@ function complete(){
 }
 function awardSingle(){let a=live();if(a.length!==1)return false;players[a[0]].stack+=pot;log(`${names(a[0])} wins $${pot}.`);pot=0;ended=true;finishHand();return true}
 function firstPost(){for(let n=1;n<=10;n++){let j=(button+n)%10;if(!players[j].folded&&!players[j].allin)return j}return -1}
-function nextStreet(){if(street===3){showdown();return}street++;if(street===1)board.push(draw(),draw(),draw());else board.push(draw());players.forEach(p=>{p.streetBet=0;p.action=""});currentBet=0;minRaise=2;acted=new Set();streetActions=[];actor=firstPost();log(street===1?"Flop dealt.":street===2?"Turn dealt.":"River dealt.")}
+function nextStreet(){if(street===3){showdown();return}street++;if(street===1){board.push(draw(),draw(),draw());dealSound(3)}else{board.push(draw());dealSound(1)}players.forEach(p=>{p.streetBet=0;p.action=""});currentBet=0;minRaise=2;acted=new Set();streetActions=[];actor=firstPost();log(street===1?"Flop dealt.":street===2?"Turn dealt.":"River dealt.")}
 function aiDecision(i){let p=players[i],c=callAmt(i),r=Math.random(),style=STYLE[BOT_STYLES[i]]||STYLE.TAG;if(street===0){let a=rv(p.cards[0].r),b=rv(p.cards[1].r),pair=a===b,hi=Math.max(a,b),lo=Math.min(a,b),suited=p.cards[0].s===p.cards[1].s,score=hi+(pair?8:0)+(suited?2:0)+(lo>=10?2:0)+style.loose,pressure=currentBet>=6?2:currentBet>2?1:0;if(c){if(score<11+pressure*2&&r<.82-style.sticky)return["fold",0];if(c>Math.max(12,pot*.55)&&score<17&&r<.80-style.sticky)return["fold",0];if(score>=20&&r<.28+style.aggr)return["raise",Math.min(p.streetBet+p.stack,currentBet+Math.max(minRaise,Math.round(pot*.65)))];return["call",0]}if(score>=15&&r<.48+style.aggr)return["raise",Math.min(p.streetBet+p.stack,Math.max(4,Math.round(pot*.65)))];return["check",0]}let rank=eval7(p.cards.concat(board))[0]||0,frac=c/Math.max(1,pot),multi=live().length;if(c){let f=rank===0?.82:rank===1?(frac>=.75?.78:frac>=.4?.58:.35)+(multi>=4?.12:0):rank===2?(frac>=.9?.45:.18)+(multi>=5?.10:0):.04;f=Math.max(.02,Math.min(.95,f-style.sticky));if(r<f)return["fold",0];if(rank>=3&&r<.30+style.aggr)return["raise",Math.min(p.streetBet+p.stack,currentBet+Math.max(minRaise,Math.round(pot*.55)))];return["call",0]}if(rank>=3&&r<.58+style.aggr)return["raise",Math.min(p.streetBet+p.stack,Math.max(2,Math.round(pot*.6)))];if(rank>=1&&r<.25+style.aggr)return["raise",Math.min(p.streetBet+p.stack,Math.max(2,Math.round(pot*.45)))];return["check",0]}
 function runoutIfNoActions(){
  if(ended)return true;
  if(actionable().length===0){
    while(street<3){
      street++;
-     if(street===1)board.push(draw(),draw(),draw()); else board.push(draw());
+     if(street===1){board.push(draw(),draw(),draw());dealSound(3)} else {board.push(draw());dealSound(1)}
      players.forEach(p=>{p.streetBet=0;p.action=""});
      currentBet=0;acted=new Set();streetActions=[];
      log(street===1?"Flop dealt.":street===2?"Turn dealt.":"River dealt.");
@@ -576,6 +598,7 @@ function start(){
  let next=active.find(i=>i>button);button=next===undefined?active[0]:next;
  shuffle();players=[];
  for(let i=0;i<10;i++){let out=oldStacks[i]<=0;players.push({cards:out?[]:[draw(),draw()],stack:oldStacks[i],streetBet:0,folded:out,allin:false,action:out?"OUT":"",style:BOT_STYLES[i]||"Hero"})}
+ dealSound(2);
  board=[];street=0;pot=0;currentBet=0;lastShowdown=null;gptVerdictBusy=false;gptRecommendationBusy=false;gptRecommendation=null;gptRecommendationKey="";minRaise=2;acted=new Set();streetActions=[];handActions=[];paused=false;ended=false;coachVisible=false;snapshot=null;logs=[];heroReviews=[];handNo++;handStartStacks=players.map(p=>p.stack);
  $("continue").style.display="none";$("next").style.display="none";$("sizes").classList.remove("show");$("toggleCoach").textContent="Show coach";
  let order=clockwiseActive(button),sb,bb;

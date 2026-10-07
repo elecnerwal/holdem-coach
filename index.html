@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v38</title>
+<title>Hold'em Coach v39</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -28,6 +28,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 #seat3{grid-column:1;grid-row:4}#seat9{grid-column:5;grid-row:4}
 #seat2{grid-column:2;grid-row:5}#seat1{grid-column:3;grid-row:5}#hero{grid-column:4;grid-row:5}
 .tenTable .board{grid-column:2/5;grid-row:2/5}
+.dealIn{grid-column:3;grid-row:3;z-index:10;align-self:center;justify-self:center;font-size:20px;padding:14px 30px;box-shadow:0 8px 28px rgba(0,0,0,.35)}
 @media(max-width:900px){.tenTable{min-height:560px}.tenTable .seat{font-size:10px}.tenTable .card{width:27px;height:38px;font-size:11px}}
 
 .chatMessages{background:#0d1117;border:1px solid var(--border);border-radius:9px;padding:10px;min-height:120px;max-height:260px;overflow:auto;font-size:13px;line-height:1.45}
@@ -67,15 +68,15 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v38</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
-  <div><button id="toggleCoach">Show coach</button> <button id="newHand">Deal In</button></div>
+  <div><strong>Hold'em Coach v39</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><button id="toggleCoach">Show coach</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
   <main class="tablePanel">
    <div class="status"><div><strong id="street">Preflop</strong><div id="turn" class="muted"></div></div><div><div class="muted">POT</div><div id="pot" class="pot">$3</div></div></div>
    <div class="table tenTable">
     <div id="seat5" class="seat sTop"></div><div id="seat6" class="seat sTop"></div><div id="seat7" class="seat sTop"></div>
-    <div id="seat4" class="seat sLeft"></div><div id="board" class="board"></div><div id="seat8" class="seat sRight"></div>
+    <div id="seat4" class="seat sLeft"></div><div id="board" class="board"></div><button id="dealIn" class="dealIn primary">Deal In</button><div id="seat8" class="seat sRight"></div>
     <div id="seat3" class="seat sLeft"></div><div id="seat9" class="seat sRight"></div>
     <div id="seat2" class="seat sBottom"></div><div id="seat1" class="seat sBottom"></div><div id="hero" class="seat sBottom"></div>
    </div>
@@ -817,7 +818,8 @@ $("chatSend").onclick=sendChat;
 $("chatInput").addEventListener("keydown",e=>{if(e.key==="Enter")sendChat()});
 $("toggleCoach").onclick=()=>{coachVisible=!coachVisible;$("toggleCoach").textContent=coachVisible?"Hide coach":"Show coach";render()}
 let dealtIn=false;
-$("newHand").onclick=()=>{unlockAudio();dealtIn=true;$("newHand").textContent="New hand";start()};
+$("dealIn").onclick=()=>{unlockAudio();dealtIn=true;$("dealIn").style.display="none";$("newHand").style.display="inline-block";start()};
+$("newHand").onclick=()=>{unlockAudio();start()};
 $("next").onclick=()=>{unlockAudio();start()};
 $("fold").onclick=()=>heroAction("fold");
 $("checkCall").onclick=()=>heroAction(callAmt(0)?"call":"check");

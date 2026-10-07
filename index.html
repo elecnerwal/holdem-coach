@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v15</title>
+<title>Hold'em Coach v16</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -67,7 +67,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v15</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v16</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand">New hand</button></div>
  </div>
  <div class="grid">
@@ -108,9 +108,9 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
    <div id="analysisBox" class="box analysis"><h3>Analysis</h3><div id="analysis"></div></div>
 <div class="box">
  <h3>Ask the Coach</h3>
- <div id="chatMessages" class="chatMessages"><div class="chatBot">Ask about the hand, your decision, pot odds, ranges, or what you should be thinking about.</div></div>
+ <div id="chatMessages" class="chatMessages"><div class="chatBot">Ask ChatGPT about your hand, your decision, or what the other players might have.</div></div>
  <div class="chatRow"><input id="chatInput" type="text" placeholder="Ask about this hand…" autocomplete="off"><button id="chatSend" class="primary">Send</button></div>
- <div class="muted" style="font-size:11px;margin-top:7px">Hand context is included automatically.</div>
+ <div class="muted" style="font-size:11px;margin-top:7px">Connected to ChatGPT through your Cloudflare Worker. Current hand context is sent with each question.</div>
 </div>
   </aside>
  </div>
@@ -525,38 +525,61 @@ function showHeroRebuy(){
  $("next").style.display="none";$("actions").style.display="none";
 }
 
+const CHAT_API="https://holdem-coach-api.lawrence-le.workers.dev/";
+let chatBusy=false,chatTurns=[];
 function chatContext(){
- let hero=players[0],d=(!ended&&hero&&hero.cards.length)?coachData():null;
- return {street:["Preflop","Flop","Turn","River","Showdown"][street],position:hero?pos(0):"",cards:hero&&hero.cards?hero.cards.map(x=>x.r+x.s).join(" "):"",board:board.map(x=>x.r+x.s).join(" "),pot,currentBet,call:hero?callAmt(0):0,stack:hero?hero.stack:0,hand:hero&&hero.cards.length?heroHand():"",coach:d};
+ const hero=players[0];
+ const showCards=ended||street===4;
+ const seats=players.map((p,i)=>({
+  seat:names(i),position:pos(i),stack:p.stack,folded:p.folded,allIn:p.allin,
+  committedThisStreet:p.streetBet,
+  ...(i===0||showCards?{cards:(p.cards||[]).map(x=>x.r+x.s)}:{})
+ }));
+ return {
+  handNumber:handNo,street:["Preflop","Flop","Turn","River","Showdown"][street]||"Showdown",
+  heroPosition:pos(0),heroCards:(hero.cards||[]).map(x=>x.r+x.s),
+  board:board.map(x=>x.r+x.s),pot,currentBet,amountToCall:callAmt(0),
+  heroStack:hero.stack,heroHand:hero.cards.length?heroHand():"",
+  players:seats,actionLog:logs.slice(-65),
+  decisions:heroReviews.map(r=>({street:r.street,action:r.action,verdict:r.verdict,analysis:r.analysis})),
+  ...(snapshot?{lastDecision:{street:snapshot.street,action:snapshot.action,verdict:snapshot.verdict,analysis:snapshot.analysis,rawRandomEquity:snapshot.e,requiredEquity:snapshot.need}}:{}),
+  note:"Game's heuristic verdicts and random-hand equity may be wrong; use actual betting action and cards."
+ };
 }
-function localCoachReply(q){
- let x=chatContext(),s=q.toLowerCase(),d=x.coach;
- if(!players[0]||!players[0].cards.length)return "Start a hand and I can talk through it with you.";
- if(s.includes("pot odds")||s.includes("odds")||s.includes("math")){
-  if(!x.call)return "You aren't facing a bet right now, so there isn't a call price to compare. The pot is $"+x.pot+".";
-  let need=100*x.call/(x.pot+x.call);
-  return "You're calling $"+x.call+" to play for a $"+(x.pot+x.call)+" pot, so you need about "+need.toFixed(1)+"% equity to break even. The harder question is whether the opponents' action makes your real equity better or worse than that.";
- }
- if(s.includes("range")||s.includes("have")||s.includes("holding")){
-  let ap=actionPressure();
-  if(ap.raises&&ap.calls)return "I would weight their ranges toward real made hands and strong draws. The bet matters, but the caller makes the combined action much stronger than two random hands.";
-  if(ap.raises)return "The bettor's range should be narrower than a random hand. How narrow depends on the board, sizing, position, and how they've been playing.";
-  return "Nobody has shown much strength on this street yet, so I wouldn't narrow their ranges aggressively.";
- }
- if(s.includes("why")||s.includes("should")||s.includes("what do")||s.includes("fold")||s.includes("call")||s.includes("raise")||s.includes("bet")){
-  if(d)return d.txt+" My lean is: "+d.rec+".";
- }
- if(s.includes("hand")||s.includes("situation")||s.includes("spot")){
-  return "You're "+x.position+" with "+x.cards+(x.board?" on "+x.board:"")+". The pot is $"+x.pot+(x.call?", and it's $"+x.call+" to you.":".")+" You currently have "+x.hand.toLowerCase()+".";
- }
- return d?d.txt+" If you want, ask me specifically about the opponent's range, the price you're getting, or whether I'd fold, call, or raise.":"Ask me about the current hand and I'll talk it through.";
+function addChatMessage(role,message){
+ const m=$("chatMessages"),el=document.createElement("div");
+ el.className=role==="user"?"chatUser":"chatBot";
+ el.textContent=message;m.appendChild(el);m.scrollTop=m.scrollHeight;
+ return el;
 }
-function sendChat(){
- let inp=$("chatInput"),q=inp.value.trim();if(!q)return;
- let m=$("chatMessages");m.insertAdjacentHTML("beforeend",'<div class="chatUser"></div>');m.lastElementChild.textContent=q;inp.value="";
- let reply=localCoachReply(q);m.insertAdjacentHTML("beforeend",'<div class="chatBot"></div>');m.lastElementChild.textContent=reply;m.scrollTop=m.scrollHeight;
+async function sendChat(){
+ if(chatBusy)return;
+ const inp=$("chatInput"),q=inp.value.trim();
+ if(!q)return;
+ inp.value="";addChatMessage("user",q);
+ const placeholder=addChatMessage("assistant","Thinking…");
+ chatBusy=true;$("chatSend").disabled=true;
+ try{
+  const context=chatContext();
+  const history=chatTurns.slice(-6).map(x=>x.role+": "+x.text).join("\n");
+  const question=history?"Earlier conversation:\n"+history+"\n\nCurrent question: "+q:q;
+  const response=await fetch(CHAT_API,{
+   method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({question:question.slice(0,1500),context})
+  });
+  const data=await response.json();
+  if(!response.ok||!data.answer)throw Error(data.details||data.error||"No response from coach");
+  placeholder.textContent=data.answer;
+  chatTurns.push({role:"user",text:q},{role:"assistant",text:data.answer});
+ }catch(err){
+  placeholder.textContent="Couldn't reach ChatGPT: "+err.message+". Check that the Cloudflare Worker is deployed and OpenAI API billing is enabled.";
+ }finally{
+  chatBusy=false;$("chatSend").disabled=false;
+  $("chatMessages").scrollTop=$("chatMessages").scrollHeight;
+ }
 }
-$("chatSend").onclick=sendChat;$("chatInput").addEventListener("keydown",e=>{if(e.key==="Enter")sendChat()});
+$("chatSend").onclick=sendChat;
+$("chatInput").addEventListener("keydown",e=>{if(e.key==="Enter")sendChat()});
 $("toggleCoach").onclick=()=>{coachVisible=!coachVisible;$("toggleCoach").textContent=coachVisible?"Hide coach":"Show coach";render()}
 $("newHand").onclick=start;$("next").onclick=start;
 $("fold").onclick=()=>heroAction("fold");

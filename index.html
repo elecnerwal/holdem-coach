@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v12</title>
+<title>Hold'em Coach v13</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -29,12 +29,16 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 #seat2{grid-column:2;grid-row:5}#seat1{grid-column:3;grid-row:5}#hero{grid-column:4;grid-row:5}
 .tenTable .board{grid-column:2/5;grid-row:2/5}
 @media(max-width:900px){.tenTable{min-height:560px}.tenTable .seat{font-size:10px}.tenTable .card{width:27px;height:38px;font-size:11px}}
+
+.chatMessages{background:#0d1117;border:1px solid var(--border);border-radius:9px;padding:10px;min-height:120px;max-height:260px;overflow:auto;font-size:13px;line-height:1.45}
+.chatUser,.chatBot{margin:7px 0;padding:8px 10px;border-radius:9px}.chatUser{background:#1f3a5f;margin-left:28px}.chatBot{background:#20262e;margin-right:20px}.chatRow{display:flex;gap:7px;margin-top:8px}
+.chatRow input{flex:1;min-width:0;background:#0d1117;color:var(--text);border:1px solid var(--border);border-radius:9px;padding:10px}
 </style>
 </head>
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v12</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v13</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand">New hand</button></div>
  </div>
  <div class="grid">
@@ -72,7 +76,13 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
      <div><div class="label">Hero hand</div><strong id="handLabel"></strong></div>
     </div>
    </div>
-   <div id="analysisBox" class="box analysis"><h3>Analysis</h3><div id="analysis"></div></div><div id="sessionBox" class="box analysis"><h3>Bankroll Swing Analysis</h3><div id="sessionAnalysis"></div></div>
+   <div id="analysisBox" class="box analysis"><h3>Analysis</h3><div id="analysis"></div></div>
+<div class="box">
+ <h3>Ask the Coach</h3>
+ <div id="chatMessages" class="chatMessages"><div class="chatBot">Ask about the hand, your decision, pot odds, ranges, or what you should be thinking about.</div></div>
+ <div class="chatRow"><input id="chatInput" type="text" placeholder="Ask about this hand…" autocomplete="off"><button id="chatSend" class="primary">Send</button></div>
+ <div class="muted" style="font-size:11px;margin-top:7px">Hand context is included automatically.</div>
+</div>
   </aside>
  </div>
 </div>
@@ -410,13 +420,6 @@ function finishHand(){
   const deltas=players.map((p,i)=>p.stack-handStartStacks[i]);
   handHistory.push({hand:handNo,deltas});
   const busted=players.map((p,i)=>p.stack===0?i:-1).filter(i=>i>=0);
-  if(busted.length){
-   const swings=[];
-   handHistory.forEach(h=>h.deltas.forEach((d,i)=>{if(d)swings.push({hand:h.hand,i,d})}));
-   swings.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
-   $("sessionAnalysis").innerHTML="<p><strong>"+busted.map(names).join(", ")+"</strong> reached $0.</p>"+swings.slice(0,8).map(s=>"<div><strong>Hand "+s.hand+" · "+names(s.i)+"</strong>: "+(s.d>0?"+":"")+"$"+s.d+"</div>").join("");
-   $("sessionBox").classList.add("show");coachVisible=true;$("coach").classList.add("show");$("toggleCoach").textContent="Hide coach";
-  }
  }
  $("next").style.display="inline-block";
  showHandVerdict();
@@ -437,7 +440,7 @@ function start(){
  shuffle();players=[];
  for(let i=0;i<10;i++){let out=oldStacks[i]<=0;players.push({cards:out?[]:[draw(),draw()],stack:oldStacks[i],streetBet:0,folded:out,allin:false,action:out?"OUT":""})}
  board=[];street=0;pot=0;currentBet=0;minRaise=2;acted=new Set();streetActions=[];paused=false;ended=false;coachVisible=false;snapshot=null;logs=[];heroReviews=[];handNo++;handStartStacks=players.map(p=>p.stack);
- $("continue").style.display="none";$("next").style.display="none";$("sizes").classList.remove("show");$("sessionBox").classList.remove("show");$("toggleCoach").textContent="Show coach";
+ $("continue").style.display="none";$("next").style.display="none";$("sizes").classList.remove("show");$("toggleCoach").textContent="Show coach";
  let order=clockwiseActive(button),sb,bb;
  if(active.length===2){sb=button;bb=order[0]}else{sb=order[0];bb=order[1]}
  let sbPay=Math.min(1,players[sb].stack),bbPay=Math.min(2,players[bb].stack);
@@ -456,6 +459,39 @@ function showHeroRebuy(){
  setTimeout(()=>{let b=$("rebuyHero");if(b)b.onclick=()=>{players[0].stack=200;heroBusted=false;start()};let l=$("leaveHero");if(l)l.onclick=()=>{$("analysis").textContent="Session ended."}},0);
  $("next").style.display="none";$("actions").style.display="none";
 }
+
+function chatContext(){
+ let hero=players[0],d=(!ended&&hero&&hero.cards.length)?coachData():null;
+ return {street:["Preflop","Flop","Turn","River","Showdown"][street],position:hero?pos(0):"",cards:hero&&hero.cards?hero.cards.map(x=>x.r+x.s).join(" "):"",board:board.map(x=>x.r+x.s).join(" "),pot,currentBet,call:hero?callAmt(0):0,stack:hero?hero.stack:0,hand:hero&&hero.cards.length?heroHand():"",coach:d};
+}
+function localCoachReply(q){
+ let x=chatContext(),s=q.toLowerCase(),d=x.coach;
+ if(!players[0]||!players[0].cards.length)return "Start a hand and I can talk through it with you.";
+ if(s.includes("pot odds")||s.includes("odds")||s.includes("math")){
+  if(!x.call)return "You aren't facing a bet right now, so there isn't a call price to compare. The pot is $"+x.pot+".";
+  let need=100*x.call/(x.pot+x.call);
+  return "You're calling $"+x.call+" to play for a $"+(x.pot+x.call)+" pot, so you need about "+need.toFixed(1)+"% equity to break even. The harder question is whether the opponents' action makes your real equity better or worse than that.";
+ }
+ if(s.includes("range")||s.includes("have")||s.includes("holding")){
+  let ap=actionPressure();
+  if(ap.raises&&ap.calls)return "I would weight their ranges toward real made hands and strong draws. The bet matters, but the caller makes the combined action much stronger than two random hands.";
+  if(ap.raises)return "The bettor's range should be narrower than a random hand. How narrow depends on the board, sizing, position, and how they've been playing.";
+  return "Nobody has shown much strength on this street yet, so I wouldn't narrow their ranges aggressively.";
+ }
+ if(s.includes("why")||s.includes("should")||s.includes("what do")||s.includes("fold")||s.includes("call")||s.includes("raise")||s.includes("bet")){
+  if(d)return d.txt+" My lean is: "+d.rec+".";
+ }
+ if(s.includes("hand")||s.includes("situation")||s.includes("spot")){
+  return "You're "+x.position+" with "+x.cards+(x.board?" on "+x.board:"")+". The pot is $"+x.pot+(x.call?", and it's $"+x.call+" to you.":".")+" You currently have "+x.hand.toLowerCase()+".";
+ }
+ return d?d.txt+" If you want, ask me specifically about the opponent's range, the price you're getting, or whether I'd fold, call, or raise.":"Ask me about the current hand and I'll talk it through.";
+}
+function sendChat(){
+ let inp=$("chatInput"),q=inp.value.trim();if(!q)return;
+ let m=$("chatMessages");m.insertAdjacentHTML("beforeend",'<div class="chatUser"></div>');m.lastElementChild.textContent=q;inp.value="";
+ let reply=localCoachReply(q);m.insertAdjacentHTML("beforeend",'<div class="chatBot"></div>');m.lastElementChild.textContent=reply;m.scrollTop=m.scrollHeight;
+}
+$("chatSend").onclick=sendChat;$("chatInput").addEventListener("keydown",e=>{if(e.key==="Enter")sendChat()});
 $("toggleCoach").onclick=()=>{coachVisible=!coachVisible;$("toggleCoach").textContent=coachVisible?"Hide coach":"Show coach";render()}
 $("newHand").onclick=start;$("next").onclick=start;
 $("fold").onclick=()=>heroAction("fold");

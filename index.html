@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v34</title>
+<title>Hold'em Coach v35</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -67,7 +67,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v34</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v35</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand">New hand</button></div>
  </div>
  <div class="grid">
@@ -555,17 +555,19 @@ function showdownReviewNote(){
  return " "+o.sentence;
 }
 function showHandVerdict(){
- let verdict,analysis;
+ let verdict,analysis,graded=heroReviews.filter(r=>r.gptComplete),ungraded=heroReviews.filter(r=>!r.gptComplete);
  if(!heroReviews.length){verdict="NOT MUCH TO REVIEW";analysis="You never really had a decision in this one."}
+ else if(!graded.length){verdict="HAND COMPLETE";analysis="ChatGPT didn't successfully grade your decisions in this hand."}
  else{
-  let major=heroReviews.filter(r=>r.severity==="major"),minor=heroReviews.filter(r=>r.severity==="minor"),close=heroReviews.filter(r=>r.severity==="close"),good=heroReviews.filter(r=>r.severity==="good");
-  if(!major.length&&!minor.length&&!close.length){verdict="VERY WELL PLAYED";analysis="Clean hand. I wouldn't change anything important."}
-  else if(!major.length&&!minor.length&&close.length){verdict="SOLID HAND";analysis="You handled the important spots well. A couple decisions were close, but nothing stands out as a mistake."}
-  else if(!major.length&&minor.length===1){verdict="GOOD HAND WITH ONE SMALL LEAK";analysis=minor[0].analysis}
-  else if(!major.length){verdict="MOSTLY GOOD";analysis="Nothing disastrous, but there are a few spots where you're giving away a little value. The biggest one: "+minor[0].analysis}
-  else if(major.length===1&&good.length){verdict="MOSTLY GOOD — ONE MISTAKE";analysis=major[0].analysis}
-  else if(major.length===1){verdict="ONE THING TO FIX";analysis=major[0].analysis}
-  else {verdict="A ROUGH HAND";analysis="There were a couple spots I'd play differently. Most important: "+major[0].analysis}
+  let major=graded.filter(r=>r.severity==="major"),minor=graded.filter(r=>r.severity==="minor"),close=graded.filter(r=>r.severity==="close"),good=graded.filter(r=>r.severity==="good");
+  let worst=major[0]||minor[0]||close[0];
+  if(major.length>1){verdict="A ROUGH HAND";analysis=worst.analysis||worst.verdict}
+  else if(major.length===1){verdict=good.length?"MOSTLY GOOD — ONE MISTAKE":"ONE THING TO FIX";analysis=worst.analysis||worst.verdict}
+  else if(minor.length>1){verdict="MOSTLY GOOD";analysis=worst.analysis||worst.verdict}
+  else if(minor.length===1){verdict="GOOD HAND WITH ONE SMALL LEAK";analysis=worst.analysis||worst.verdict}
+  else if(close.length){verdict="SOLID HAND";analysis="No clear mistake. "+(close[0].analysis||close[0].verdict)}
+  else {verdict="VERY WELL PLAYED";analysis="ChatGPT graded the decisions in this hand positively."}
+  if(ungraded.length)analysis+=" "+ungraded.length+" decision"+(ungraded.length===1?" was":"s were")+" not graded because the coach request failed.";
  }
  coachVisible=true;$("coach").classList.add("show");$("toggleCoach").textContent="Hide coach";
  $("recLabel").textContent="Hand Verdict";$("recommend").textContent=verdict;$("thinking").textContent="Hand complete.";
@@ -773,10 +775,16 @@ async function getGPTVerdict(d,type){
   $("recommend").textContent=first.toUpperCase();
   $("thinking").textContent=reason||text;
   if(snapshot){snapshot.verdict=first;snapshot.analysis=text}
-  if(heroReviews.length){let rr=heroReviews[heroReviews.length-1];rr.verdict=first;rr.analysis=text;rr.severity="gpt"}
+  if(heroReviews.length){
+   let rr=heroReviews[heroReviews.length-1],v=first.toUpperCase();
+   rr.verdict=first;rr.analysis=reason||text;rr.gptComplete=true;
+   rr.severity=/SHOULD HAVE|BAD |MISTAKE|TOO LOOSE|TOO TIGHT/.test(v)?"major":/TOO SMALL|TOO LARGE|SMALL LEAK|SLIGHT/.test(v)?"minor":/CLOSE|MARGINAL|EITHER/.test(v)?"close":/GOOD|CORRECT|WELL PLAYED|FINE|STANDARD/.test(v)?"good":"gpt";
+  }
  }catch(err){
   $("recommend").textContent="COACH UNAVAILABLE";
   $("thinking").textContent="ChatGPT couldn't grade this decision. The decision math is still shown below.";
+  if(snapshot){snapshot.verdict="COACH UNAVAILABLE";snapshot.analysis="GPT grading failed."}
+  if(heroReviews.length){let rr=heroReviews[heroReviews.length-1];rr.verdict="COACH UNAVAILABLE";rr.analysis="GPT grading failed.";rr.severity="ungraded";rr.gptComplete=false}
  }finally{gptVerdictBusy=false;render()}
 }
 function addChatMessage(role,message){

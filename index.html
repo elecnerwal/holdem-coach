@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v32</title>
+<title>Hold'em Coach v33</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -67,7 +67,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v32</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v33</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand">New hand</button></div>
  </div>
  <div class="grid">
@@ -561,6 +561,8 @@ function finishHand(){
 function showdown(){street=4;ended=true;let contrib=players.map((p,i)=>Math.max(0,handStartStacks[i]-p.stack)),levels=[...new Set(contrib.filter(x=>x>0))].sort((a,b)=>a-b),prev=0,payouts=Array(10).fill(0),pots=[];for(const level of levels){let participants=contrib.map((x,i)=>x>=level?i:-1).filter(i=>i>=0),amount=(level-prev)*participants.length;prev=level;if(!amount)continue;let eligible=participants.filter(i=>!players[i].folded);if(!eligible.length)continue;let best=null,w=[];for(const i of eligible){let rr=eval7(players[i].cards.concat(board));if(!best||cmp(rr,best)>0){best=rr;w=[i]}else if(cmp(rr,best)===0)w.push(i)}let share=Math.floor(amount/w.length),rem=amount-share*w.length;w.forEach((i,k)=>{let win=share+(k===0?rem:0);players[i].stack+=win;payouts[i]+=win});pots.push({amount,winners:w.map(names),hand:handNames[best[0]]})}let totalPot=pot,winners=payouts.map((x,i)=>x>0?i:-1).filter(i=>i>=0),lead=winners.slice().sort((a,b)=>payouts[b]-payouts[a])[0],leadHand=lead!==undefined?handNames[eval7(players[lead].cards.concat(board))[0]]:"";if(winners.length===1){let h=leadHand.toLowerCase(),rr=eval7(players[lead].cards.concat(board)),rankWord=v=>v===14?"A":v===13?"K":v===12?"Q":v===11?"J":v===10?"T":String(v),desc=h==="high card"?rankWord(rr[1])+" high":h==="pair"?"a pair of "+rankWord(rr[1])+"s with "+rankWord(rr[2])+" kicker":h==="two pair"?"two pair, "+rankWord(rr[1])+"s and "+rankWord(rr[2])+"s, "+rankWord(rr[3])+" kicker":h==="trips"?"three of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="quads"?"four of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="straight"?"a straight, "+rankWord(rr[1])+" high":h==="flush"?"a flush, "+rankWord(rr[1])+" high":"a "+h;log("Showdown: "+names(lead)+" wins $"+payouts[lead]+" with "+desc+".")}else log("Showdown: "+winners.map(i=>names(i)+" wins $"+payouts[i]).join("; ")+".");lastShowdown={totalPot,board:cardsText(board),payouts:winners.map(i=>({player:names(i),amount:payouts[i],cards:cardsText(players[i].cards),hand:handNames[eval7(players[i].cards.concat(board))[0]]})),sidePots:pots};pot=0;finishHand();render()}
 function start(){
  clearTimeout(botTimer);botTimer=null;
+ if(chatTurns.length){chatArchive.push({hand:handNo,turns:chatTurns.slice()});chatTurns=[]}
+ const cm=$("chatMessages");if(cm)cm.innerHTML='<div class="chatBot">Ask ChatGPT about your hand, your decision, or what the other players might have.</div>';
  let first=players.length!==10;
  let oldStacks=first?Array(10).fill(200):players.map(p=>p.stack);
  if(!first){
@@ -596,7 +598,7 @@ function showHeroRebuy(){
 }
 
 const CHAT_API="https://holdem-coach-api.lawrence-le.workers.dev/";
-let chatBusy=false,chatTurns=[];
+let chatBusy=false,chatTurns=[],chatArchive=[];
 function streetName(n){return ["Preflop","Flop","Turn","River","Showdown"][n]||"Showdown"}
 function cardsText(cs){return (cs||[]).map(x=>x.r+x.s)}
 function deterministicHandFacts(cards,b){if(!cards||cards.length!==2)return null;let all=cards.concat(b||[]),f={holeCards:cardsText(cards),board:cardsText(b||[])};if(all.length>=5){let er=eval7(all);f.evaluatedHand=handNames[er[0]];f.rankVector=er;if(er[0]===4||er[0]===8)f.straightHighRank=er[1]===14?"Ace":ranks[er[1]-2]}let sc={};all.forEach(c=>sc[c.s]=(sc[c.s]||0)+1);f.hasMadeFlush=Object.values(sc).some(n=>n>=5);f.flushSuits=Object.entries(sc).filter(x=>x[1]>=5).map(x=>x[0]);let br={};(b||[]).forEach(c=>br[c.r]=(br[c.r]||0)+1);f.boardPaired=Object.values(br).some(n=>n>=2);f.boardTrips=Object.values(br).some(n=>n>=3);f.authoritative=true;f.instruction="Engine-computed ground truth. Do not contradict these facts.";return f}
@@ -738,15 +740,15 @@ async function getGPTVerdict(d,type){
  render();
  try{
   const response=await fetch(CHAT_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-   question:"Grade my most recent poker decision. Return a concise verdict first. For raises and bets, separately judge (1) whether raising/betting was appropriate and (2) whether the chosen size was appropriate. Prefer precise verdicts such as GOOD RAISE, RAISE TOO SMALL, RAISE TOO LARGE, SHOULD HAVE FOLDED, GOOD CALL, or CLOSE DECISION instead of vague TOO LOOSE/TOO TIGHT when sizing is the real issue. A preflop raise after limpers is an isolation raise, not an open. Use priorActionsThisStreet and preflopLimpCount. Treat authoritativeHandFacts as ground truth. Treat the engine-supplied starting-hand strength, rawEquityVsRandomHands (shown in the UI as Estimated equity), requiredEquity, amountToCall, potBeforeDecision and other numeric decision-math fields as ground truth too: quote them exactly if mentioned and never recalculate or replace them with your own estimate. Then give 1–3 short sentences. Do not recap the whole hand.",
+   question:"Grade my most recent poker decision. OUTPUT EXACTLY TWO LINES. Line 1 must be VERDICT: followed by a short verdict such as GOOD RAISE, RAISE TOO SMALL, RAISE TOO LARGE, SHOULD HAVE FOLDED, GOOD CALL, GOOD CHECK, or CLOSE DECISION. Line 2 must be REASON: followed by 1–2 concise sentences. Do not put anything before VERDICT:. For raises and bets, judge both whether the action and size were appropriate. A preflop raise after limpers is an isolation raise, not an open. Use priorActionsThisStreet and preflopLimpCount. Treat authoritativeHandFacts and all engine numeric decision-math fields as ground truth; never recalculate or contradict them.",
    context:fastCoachContext("automatic_decision_verdict",decision)
   })});
   const data=await response.json();
   if(!response.ok||!data.answer)throw Error(data.details||data.error||"No verdict");
-  let text=data.answer.trim(),parts=text.split(/\n+/),first=parts.shift().replace(/^\*+|\*+$/g,"").replace(/^Conclusion:\s*/i,"").trim();
-  if(first.length>65){first="CHATGPT VERDICT";parts.unshift(text)}
+  let text=data.answer.trim(),vm=text.match(/VERDICT:\s*([^\n]+)/i),rm=text.match(/REASON:\s*([\s\S]*)/i),parts=text.split(/\n+/),first=(vm?vm[1]:parts.shift()).replace(/^\*+|\*+$/g,"").replace(/^Conclusion:\s*/i,"").trim(),reason=(rm?rm[1]:parts.join(" ")).replace(/^\*+|\*+$/g,"").trim();
+  if(first.length>65)first=first.slice(0,65);
   $("recommend").textContent=first.toUpperCase();
-  $("thinking").textContent=parts.join(" ").trim()||text;
+  $("thinking").textContent=reason||text;
   if(snapshot){snapshot.verdict=first;snapshot.analysis=text}
   if(heroReviews.length){let rr=heroReviews[heroReviews.length-1];rr.verdict=first;rr.analysis=text;rr.severity="gpt"}
  }catch(err){

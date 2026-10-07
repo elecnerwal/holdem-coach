@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v10</title>
+<title>Hold'em Coach v11</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -34,7 +34,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v10</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v11</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand">New hand</button></div>
  </div>
  <div class="grid">
@@ -64,7 +64,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
    <div class="box">
     <h3>Decision Math</h3>
     <div class="math">
-     <div><div class="label">Estimated equity</div><div id="equity" class="num"></div></div>
+     <div><div class="label">Raw equity vs random hands</div><div id="equity" class="num"></div></div>
      <div><div class="label">Equity needed</div><div id="needed" class="num"></div></div>
      <div><div class="label">Price to call</div><strong id="price"></strong></div>
      <div><div class="label">Pot after call</div><strong id="afterPot"></strong></div>
@@ -79,7 +79,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <script>
 (()=>{
 const $=id=>document.getElementById(id), ranks="23456789TJQKA".split(""), suits=["♠","♥","♦","♣"];
-let deck=[], players=[], board=[], button=-1, street=0, pot=0, currentBet=0, minRaise=2, actor=0, acted=new Set(), paused=false, ended=false, coachVisible=false, logs=[], snapshot=null, handNo=0, handStartStacks=[], handHistory=[], heroReviews=[], botRebuys=Array(10).fill(0), heroBusted=false;
+let deck=[], players=[], board=[], button=-1, street=0, pot=0, currentBet=0, minRaise=2, actor=0, acted=new Set(), paused=false, ended=false, coachVisible=false, logs=[], snapshot=null, handNo=0, handStartStacks=[], handHistory=[], heroReviews=[], botRebuys=Array(10).fill(0), heroBusted=false, streetActions=[];
 const rv=r=>ranks.indexOf(r)+2, names=i=>i===0?"YOU":"P"+(i+1);
 function shuffle(){deck=[];for(const r of ranks)for(const s of suits)deck.push({r,s});for(let i=deck.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[deck[i],deck[j]]=[deck[j],deck[i]]}}
 function draw(){return deck.pop()}
@@ -165,19 +165,41 @@ function boardTexture(){
  for(let i=1;i<sorted.length;i++)if(sorted[i]-sorted[i-1]<=2)connected=true;
  return (paired?"paired ":"")+(maxSuit>=3?"monotone ":maxSuit===2?"two-tone ":"rainbow ")+(connected?"connected":"disconnected");
 }
+
+function actionPressure(){
+ let opp=streetActions.filter(a=>a.i!==0), raises=opp.filter(a=>a.type==="raise"), calls=opp.filter(a=>a.type==="call");
+ let lastRaise=raises[raises.length-1], frac=lastRaise&&lastRaise.potBefore?lastRaise.amount/lastRaise.potBefore:0;
+ let score=0;
+ if(raises.length)score+=2;if(frac>=.5)score++;if(frac>=.9)score++;
+ score+=Math.min(2,calls.length);
+ if(live().length>=3)score++;
+ return {score,raises:raises.length,calls:calls.length,frac};
+}
+function heroBoardRelation(){
+ let r=eval7(players[0].cards.concat(board))[0], hole=players[0].cards.map(x=>rv(x.r)), br=board.map(x=>rv(x.r));
+ let top=Math.max(...br), overpair=hole[0]===hole[1]&&hole[0]>top;
+ let pocket=hole[0]===hole[1], boardOver=br.filter(x=>x>Math.max(...hole)).length;
+ let flushSuit=null,sc={};board.forEach(x=>sc[x.s]=(sc[x.s]||0)+1);for(const s in sc)if(sc[s]>=3)flushSuit=s;
+ let hasFlushBlocker=flushSuit?players[0].cards.some(x=>x.s===flushSuit):false;
+ return {rank:r,overpair,pocket,boardOver,flushSuit,hasFlushBlocker};
+}
 function postClass(d){
- let rank=eval7(players[0].cards.concat(board))[0],c=d.c,need=d.need,e=d.e,texture=boardTexture();
- let edge=e-need;
+ let rel=heroBoardRelation(),rank=rel.rank,c=d.c,need=d.need,e=d.e,texture=boardTexture(),ap=actionPressure(),edge=e-need;
+ let danger=ap.score;
+ if(rel.pocket&&rel.boardOver)danger+=2;
+ if(rel.flushSuit&&!rel.hasFlushBlocker)danger++;
  if(c){
-  if(edge>=10)return {rec:rank>=2?"Raise or call":"Call",quality:"clear continue",why:"Estimated equity clears the immediate price by about "+edge.toFixed(0)+" points on a "+texture+" board."};
-  if(edge>=0)return {rec:"Call",quality:"thin continue",why:"The call is only slightly above the break-even equity threshold. This is a marginal spot, not an automatic continue."};
-  if(edge>-5)return {rec:"Fold / close",quality:"close fold",why:"Estimated equity is just below the immediate price; implied odds and opponent range could change the answer."};
-  return {rec:"Fold",quality:"clear fold",why:"Estimated equity is materially below the price being offered."};
+  if(danger>=5&&rank<=1)return {rec:"Fold",quality:"range-aware fold",confidence:"high",why:"Raw equity versus random hands is not reliable here. The combination of multiway strength, substantial betting/calling action, and this board makes the opponents' continuing ranges much stronger than random holdings."};
+  if(danger>=4&&rank<=2)return {rec:"Usually fold",quality:"range-aware fold",confidence:"medium",why:"The public action indicates concentrated strength. Your random-hand equity overstates how well this hand performs against the ranges that would bet and continue here."};
+  if(edge>=10&&danger<=2)return {rec:rank>=2?"Raise or call":"Call",quality:"clear continue",confidence:"medium",why:"Your raw equity comfortably clears the price and the public action has not shown unusually strong range pressure."};
+  if(edge>=0)return {rec:"Call / close",quality:"thin continue",confidence:"low",why:"Raw equity clears the immediate price, but opponent action narrows their ranges. Treat this as a close decision rather than an automatic call."};
+  if(edge>-5)return {rec:"Fold / close",quality:"close fold",confidence:"low",why:"Raw equity is near the price and the action does not justify assuming random opponent holdings."};
+  return {rec:"Fold",quality:"clear fold",confidence:"medium",why:"Even the raw random-hand equity is below the immediate price."};
  }
- if(rank>=3)return {rec:"Bet for value",quality:"strong value",why:"Your made hand is strong enough to seek value on this "+texture+" board."};
- if(rank>=1&&e>=45)return {rec:"Bet or check",quality:"medium-strength",why:"You have showdown value. Betting may get called by worse, but checking can protect a medium-strength range."};
- if(e>=35)return {rec:"Check / selective bluff",quality:"drawing or marginal",why:"You retain useful equity but do not have a strong made hand. Bluffing depends on range advantage and blockers."};
- return {rec:"Check often",quality:"weak",why:"With little showdown value/equity, checking is the default unless this board strongly favors your range."};
+ if(rank>=3)return {rec:"Bet for value",quality:"strong value",confidence:"medium",why:"Your made hand is strong enough to seek value on this "+texture+" board."};
+ if(rank>=1&&e>=45)return {rec:"Bet or check",quality:"medium-strength",confidence:"low",why:"You have showdown value, but the best line depends on which worse hands can call and which better hands continue."};
+ if(e>=35)return {rec:"Check / selective bluff",quality:"drawing or marginal",confidence:"low",why:"You retain useful raw equity, but bluffing requires fold equity, blockers, or range advantage."};
+ return {rec:"Check often",quality:"weak",confidence:"medium",why:"With little showdown value, checking is the default unless the board strongly favors your range."};
 }
 function coachData(){
  let ccall=callAmt(0),need=ccall?100*ccall/(pot+ccall):0,e=estimateEquity(),p=pos(0),txt="",rec="",quality="",why="";
@@ -187,8 +209,8 @@ function coachData(){
   if(currentBet>2)txt+=" You are facing a raise to $"+currentBet+".";
  } else {
   let base={c:ccall,need,e},pc=postClass(base);quality=pc.quality;rec=pc.rec;why=pc.why;
-  let hn=heroHand(),tex=boardTexture();
-  txt="You have "+hn.toLowerCase()+" on a "+tex+" board in a "+live().length+"-way pot. "+pc.why;
+  let hn=heroHand(),tex=boardTexture(),ap=actionPressure();
+  txt="You have "+hn.toLowerCase()+" on a "+tex+" board in a "+live().length+"-way pot. "+pc.why+(ap.raises||ap.calls?" Public action: "+ap.raises+" bet/raise(s), "+ap.calls+" call(s) this street.":"");
   if(live().length>2)txt+=" Multiway action makes marginal value bets and bluffs less attractive.";
  }
  return {c:ccall,need,e,p,txt,rec,quality,why,finalPot:pot+ccall,hand:heroHand(),live:live().length,street:["Preflop","Flop","Turn","River"][street]};
@@ -198,7 +220,7 @@ function renderCoach(){if(ended){showHandVerdict();return}if(paused&&snapshot){$
  else {let d=coachData();$("thinking").textContent=d.txt;$("recLabel").textContent="Recommendation";$("recommend").textContent=d.rec;$("position").textContent=d.p;$("equity").textContent=d.e.toFixed(0)+"%";$("needed").textContent=d.c?d.need.toFixed(1)+"%":"—";$("price").textContent="$"+d.c;$("afterPot").textContent="$"+d.finalPot;$("playersLive").textContent=d.live;$("handLabel").textContent=d.hand;$("analysisBox").classList.remove("show")}}
 function render(){for(let i=0;i<10;i++){let el=i===0?$("hero"):$("seat"+i);el.innerHTML=seatHTML(i);el.classList.toggle("turn",!ended&&!paused&&actor===i);el.classList.toggle("folded",players[i].folded)}$("street").textContent=["Preflop","Flop","Turn","River","Showdown"][street];$("pot").textContent="$"+pot;$("turn").textContent=ended?"Hand complete":paused?"Paused — review your decision":`${names(actor)} to act · ${pos(actor)}`;$("board").innerHTML=board.map(c=>card(c,false)).join("")+Array(5-board.length).fill('<div class="card" style="opacity:.12">?</div>').join("");$("history").innerHTML=logs.slice(-8).map(x=>"<div>"+x+"</div>").join("");$("engineState").textContent=ended?"Hand finished":paused?"Waiting for Continue":("Next: "+names(actor)+" · "+pos(actor));let ht=actor===0&&!paused&&!ended;$("actions").style.display=ht?"flex":"none";let c=callAmt(0);$("checkCall").textContent=c?`Call $${c}`:"Check";$("fold").disabled=!c;$("raise").textContent=currentBet?"Raise":"Bet";$("coach").classList.toggle("show",coachVisible);if(players[0].cards.length)renderCoach()}
 function log(x){logs.push(x)}
-function commit(i,type,target=0){let p=players[i],c=callAmt(i);if(type==="fold"){p.folded=true;p.action="Fold";acted.add(i);log(`${names(i)} folds.`);return}if(type==="check"){p.action="Check";acted.add(i);log(`${names(i)} checks.`);return}if(type==="call"){let pay=Math.min(c,p.stack);p.stack-=pay;p.streetBet+=pay;pot+=pay;p.action=`Call $${pay}`;if(!p.stack)p.allin=true;acted.add(i);log(`${names(i)} calls $${pay}.`);return}if(type==="raise"){target=Math.min(target,p.streetBet+p.stack);let old=currentBet,pay=target-p.streetBet;p.stack-=pay;p.streetBet=target;pot+=pay;currentBet=target;minRaise=Math.max(2,target-old);p.action=(old?`Raise to $${target}`:`Bet $${target}`);if(!p.stack)p.allin=true;acted=new Set([i]);log(`${names(i)} ${p.action.toLowerCase()}.`)}}
+function commit(i,type,target=0){let p=players[i],c=callAmt(i),potBefore=pot,betBefore=currentBet;if(type==="fold"){p.folded=true;p.action="Fold";acted.add(i);streetActions.push({i,type:"fold",amount:0,potBefore,betBefore});log(`${names(i)} folds.`);return}if(type==="check"){p.action="Check";acted.add(i);streetActions.push({i,type:"check",amount:0,potBefore,betBefore});log(`${names(i)} checks.`);return}if(type==="call"){let pay=Math.min(c,p.stack);p.stack-=pay;p.streetBet+=pay;pot+=pay;p.action=`Call ${pay}`;if(!p.stack)p.allin=true;acted.add(i);streetActions.push({i,type:"call",amount:pay,potBefore,betBefore});log(`${names(i)} calls ${pay}.`);return}if(type==="raise"){target=Math.min(target,p.streetBet+p.stack);let old=currentBet,pay=target-p.streetBet;p.stack-=pay;p.streetBet=target;pot+=pay;currentBet=target;minRaise=Math.max(2,target-old);p.action=(old?`Raise to $${target}`:`Bet $${target}`);if(!p.stack)p.allin=true;acted=new Set([i]);streetActions.push({i,type:"raise",amount:pay,target,potBefore,betBefore});log(`${names(i)} ${p.action.toLowerCase()}.`)}}
 function complete(){
  let a=actionable();
  if(a.length===0)return true;
@@ -206,7 +228,7 @@ function complete(){
 }
 function awardSingle(){let a=live();if(a.length!==1)return false;players[a[0]].stack+=pot;log(`${names(a[0])} wins $${pot}.`);pot=0;ended=true;finishHand();return true}
 function firstPost(){for(let n=1;n<=10;n++){let j=(button+n)%10;if(!players[j].folded&&!players[j].allin)return j}return -1}
-function nextStreet(){if(street===3){showdown();return}street++;if(street===1)board.push(draw(),draw(),draw());else board.push(draw());players.forEach(p=>{p.streetBet=0;p.action=""});currentBet=0;minRaise=2;acted=new Set();actor=firstPost();log(street===1?"Flop dealt.":street===2?"Turn dealt.":"River dealt.")}
+function nextStreet(){if(street===3){showdown();return}street++;if(street===1)board.push(draw(),draw(),draw());else board.push(draw());players.forEach(p=>{p.streetBet=0;p.action=""});currentBet=0;minRaise=2;acted=new Set();streetActions=[];actor=firstPost();log(street===1?"Flop dealt.":street===2?"Turn dealt.":"River dealt.")}
 function aiDecision(i){let p=players[i],c=callAmt(i),r=Math.random();if(street===0){let a=rv(p.cards[0].r),b=rv(p.cards[1].r),pair=a===b,hi=Math.max(a,b),suited=p.cards[0].s===p.cards[1].s,score=hi+(pair?8:0)+(suited?2:0);if(c){if(score<10&&r<.65)return["fold",0];if(score>18&&r<.35)return["raise",Math.min(p.streetBet+p.stack,currentBet+Math.max(minRaise,4))];return["call",0]}if(score>15&&r<.55)return["raise",Math.min(p.streetBet+p.stack,Math.max(4,Math.round(pot*.65)))];return["check",0]}
  let strength=eval7(p.cards.concat(board))[0]||0;
  if(c){if(strength===0&&r<.55)return["fold",0];if(strength>=2&&r<.35)return["raise",Math.min(p.streetBet+p.stack,currentBet+Math.max(minRaise,Math.round(pot*.6)))];return["call",0]}if(strength>=1&&r<.5)return["raise",Math.min(p.streetBet+p.stack,Math.max(2,Math.round(pot*.6)))];return["check",0]}
@@ -217,7 +239,7 @@ function runoutIfNoActions(){
      street++;
      if(street===1)board.push(draw(),draw(),draw()); else board.push(draw());
      players.forEach(p=>{p.streetBet=0;p.action=""});
-     currentBet=0;acted=new Set();
+     currentBet=0;acted=new Set();streetActions=[];
      log(street===1?"Flop dealt.":street===2?"Turn dealt.":"River dealt.");
    }
    showdown();
@@ -276,14 +298,16 @@ function review(type,d){
   let pc=postClass(d),edge=d.e-d.need;
   if(type==="call"){
    if(!d.c){verdict="CHECKED";analysis="No call was required.";severity="good"}
-   else if(edge>=8){verdict="GOOD CALL";analysis="You had a comfortable equity cushion over the pot-odds threshold.";severity="good"}
-   else if(edge>=0){verdict="THIN BUT DEFENSIBLE CALL";analysis="Your estimated equity only narrowly cleared the required equity. Small range changes could flip this decision.";severity="close"}
-   else if(edge>-5){verdict="MARGINAL CALL";analysis="The immediate math is slightly negative, but implied odds or a tighter opponent range could justify it.";severity="minor"}
-   else {verdict="CALL WAS TOO LOOSE";analysis="Estimated equity was materially below the break-even threshold for the price you faced.";severity="major"}
+   else if(pc.quality==="range-aware fold"){verdict="CALL WAS TOO LOOSE";analysis=pc.why+" The displayed raw equity is versus random holdings and should not override the strength shown by the action.";severity=pc.confidence==="high"?"major":"minor"}
+   else if(edge>=8){verdict="GOOD CALL";analysis="Raw equity comfortably cleared the price and the action pattern did not create enough range pressure to reverse the decision.";severity="good"}
+   else if(edge>=0){verdict="THIN BUT DEFENSIBLE CALL";analysis="Raw equity cleared the price only narrowly, and action-inferred ranges make this a close spot.";severity="close"}
+   else if(edge>-5){verdict="MARGINAL CALL";analysis="The immediate raw-equity math is slightly negative and the opponent action does not improve the case for calling.";severity="minor"}
+   else {verdict="CALL WAS TOO LOOSE";analysis="Even against random holdings, raw equity was below the break-even threshold.";severity="major"}
   } else if(type==="fold"){
-   if(edge<-5){verdict="GOOD FOLD";analysis="The price required more equity than the hand was estimated to have.";severity="good"}
-   else if(edge<2){verdict="CLOSE FOLD";analysis="This was near the break-even boundary. Folding is defensible, but the spot is sensitive to opponent range assumptions.";severity="close"}
-   else {verdict="FOLD WAS TOO TIGHT";analysis="Estimated equity cleared the immediate price, so folding surrendered a profitable or at least defensible continue.";severity=edge>10?"major":"minor"}
+   if(pc.quality==="range-aware fold"){verdict="GOOD FOLD";analysis=pc.why+" Folding is preferred despite the displayed raw equity versus random hands.";severity="good"}
+   else if(edge<-5){verdict="GOOD FOLD";analysis="Even raw equity versus random hands did not meet the price.";severity="good"}
+   else if(edge<5||pc.confidence==="low"){verdict="CLOSE FOLD";analysis="Raw equity is near or above the immediate price, but that estimate uses random holdings. The public action makes a strong continue uncertain.";severity="close"}
+   else {verdict="FOLD MAY BE TOO TIGHT";analysis="Raw equity clears the price and the action pattern is not strong enough for the coach to confidently prefer folding.";severity="minor"}
   } else if(type==="check"){
    if(pc.quality==="strong value"){verdict="MISSED VALUE";analysis="Your hand was strong enough that betting was preferred; checking may leave money on the table.";severity="minor"}
    else {verdict="SOUND CHECK";analysis=pc.why;severity="good"}
@@ -297,6 +321,13 @@ function review(type,d){
  snapshot={...d,verdict,analysis,severity,action:actionName};heroReviews.push({verdict,analysis,severity,action:actionName,street:d.street,e:d.e,need:d.need});paused=true;coachVisible=true;$("toggleCoach").textContent="Hide coach";$("continue").style.display="inline-block";render()
 }
 function heroAction(type,target=0){let d=coachData();commit(0,type,target);review(type,d)}
+function showdownReviewNote(){
+ if(street!==4||!heroReviews.length)return "";
+ let opp=players.map((p,i)=>i!==0&&p.cards&&p.cards.length===2&&!p.folded?i:-1).filter(i=>i>=0);
+ if(!opp.length)return "";
+ let revealed=opp.map(i=>names(i)+" showed "+canonHand(players[i].cards)).join(", ");
+ return " Showdown context (not used for the original decision): "+revealed+".";
+}
 function showHandVerdict(){
  let verdict,analysis;
  if(!heroReviews.length){verdict="NO MEANINGFUL DECISION";analysis="The hand ended before you faced a substantive decision."}
@@ -312,7 +343,7 @@ function showHandVerdict(){
  }
  coachVisible=true;$("coach").classList.add("show");$("toggleCoach").textContent="Hide coach";
  $("recLabel").textContent="Hand Verdict";$("recommend").textContent=verdict;$("thinking").textContent="Hand complete.";
- $("analysisBox").classList.add("show");$("analysis").textContent=analysis;
+ $("analysisBox").classList.add("show");$("analysis").textContent=analysis+showdownReviewNote();
 }
 function finishHand(){
  if(handStartStacks.length){
@@ -345,7 +376,7 @@ function start(){
  let next=active.find(i=>i>button);button=next===undefined?active[0]:next;
  shuffle();players=[];
  for(let i=0;i<10;i++){let out=oldStacks[i]<=0;players.push({cards:out?[]:[draw(),draw()],stack:oldStacks[i],streetBet:0,folded:out,allin:false,action:out?"OUT":""})}
- board=[];street=0;pot=0;currentBet=0;minRaise=2;acted=new Set();paused=false;ended=false;coachVisible=false;snapshot=null;logs=[];heroReviews=[];handNo++;handStartStacks=players.map(p=>p.stack);
+ board=[];street=0;pot=0;currentBet=0;minRaise=2;acted=new Set();streetActions=[];paused=false;ended=false;coachVisible=false;snapshot=null;logs=[];heroReviews=[];handNo++;handStartStacks=players.map(p=>p.stack);
  $("continue").style.display="none";$("next").style.display="none";$("sizes").classList.remove("show");$("sessionBox").classList.remove("show");$("toggleCoach").textContent="Show coach";
  let order=clockwiseActive(button),sb,bb;
  if(active.length===2){sb=button;bb=order[0]}else{sb=order[0];bb=order[1]}

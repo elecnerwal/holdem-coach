@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v14</title>
+<title>Hold'em Coach v15</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -33,12 +33,41 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 .chatMessages{background:#0d1117;border:1px solid var(--border);border-radius:9px;padding:10px;min-height:120px;max-height:260px;overflow:auto;font-size:13px;line-height:1.45}
 .chatUser,.chatBot{margin:7px 0;padding:8px 10px;border-radius:9px}.chatUser{background:#1f3a5f;margin-left:28px}.chatBot{background:#20262e;margin-right:20px}.chatRow{display:flex;gap:7px;margin-top:8px}
 .chatRow input{flex:1;min-width:0;background:#0d1117;color:var(--text);border:1px solid var(--border);border-radius:9px;padding:10px}
+
+/* v15: desktop-wide, viewport-conscious layout */
+@media(min-width:1100px){
+ .wrap{max-width:1760px;width:calc(100% - 36px);padding:10px 0}
+ .top{margin-bottom:8px}
+ .grid{grid-template-columns:minmax(0,1fr) minmax(370px,430px);gap:12px;align-items:start}
+ .tablePanel{padding:12px}
+ .tenTable{min-height:0;height:clamp(380px,58vh,590px);margin-top:7px;padding:12px 20px;gap:5px}
+ .tenTable .seat{padding:4px 6px;font-size:11px;align-self:stretch;min-height:0}
+ .tenTable .card{width:30px;height:40px;font-size:13px}
+ .tenTable .cards{margin:3px 0;gap:4px}
+ .tenTable .chip{margin-top:2px}
+ .history{height:clamp(60px,9vh,100px);min-height:0;overflow-y:auto;margin-top:8px;padding:7px 9px}
+ .controls{margin-top:7px}
+ .box{padding:11px 13px;margin-bottom:8px}
+ .box h3{margin-bottom:6px}
+ .rule{margin:8px 0}
+ .math{gap:7px}
+ .num{font-size:18px}
+ .chatMessages{min-height:60px;max-height:110px}
+}
+@media(min-width:1100px) and (max-height:850px){
+ .tenTable{height:clamp(340px,54vh,470px)}
+ .history{height:60px}
+ .tenTable .card{height:34px;width:27px}
+ .tenTable .seat{font-size:10px}
+ .box{padding:9px 12px;margin-bottom:6px}
+ .chatMessages{max-height:75px;min-height:55px}
+}
 </style>
 </head>
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v14</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v15</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand">New hand</button></div>
  </div>
  <div class="grid">

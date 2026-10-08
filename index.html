@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v52</title>
+<title>Hold'em Coach v53</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -68,7 +68,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v52</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v53</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -470,7 +470,7 @@ function afterHero(){
 function review(type,d){
  const rec=d.tagRecommendation,grade=STRATEGIES[STRATEGY_MODE].grade(d,type,d.actionTarget,rec);
  snapshot={...d,ruleId:rec.ruleId,verdict:grade.verdict,txt:grade.reason,analysis:grade.reason,severity:grade.severity,action:type};
- heroReviews.push({ruleId:rec.ruleId,verdict:grade.verdict,analysis:grade.reason,severity:grade.severity,gptComplete:true,action:type,street:d.street,e:d.e,need:d.need});
+ heroReviews.push({ruleId:rec.ruleId,verdict:grade.verdict,analysis:grade.reason,severity:grade.severity,gptComplete:true,action:type,street:d.street,e:d.e,need:d.need,potAtDecision:d.finalPot-d.c,amountAtRisk:type==="raise"?Math.max(0,d.actionTarget-d.heroStreetBetBefore):type==="call"?d.c:0,boardAtDecision:cardsText(board),heroCards:cardsText(players[0].cards)});
  paused=true;coachVisible=true;$("toggleCoach").textContent="Hide coach";$("continue").style.display="inline-block";render();
 }
 function heroAction(type,target=0){let d=coachData();d.tagRecommendation=strategyRecommendation(d);d.actionTarget=target;d.heroStreetBetBefore=players[0].streetBet;commit(0,type,target);review(type,d)}
@@ -527,18 +527,23 @@ function showHandVerdict(){
  $("analysisBox").classList.remove("show");
 }
 function requestFinalHandVerdict(){
- const reviewHand=handNo;
  const net=players[0].stack-handStartStacks[0];
- if(heroReviews.length===1&&heroReviews[0].action==="fold"&&heroReviews[0].street==="Preflop"){
-  const r=heroReviews[0];finalHandVerdict={verdict:r.severity==="good"?"GOOD FOLD":"PREFLOP FOLD REVIEW",reason:r.severity==="good"?"You folded preflop, as TAG recommends.":r.analysis};finalHandReviewBusy=false;showHandVerdict();return;
+ const reviews=heroReviews.slice();
+ const preFold=reviews.length===1&&reviews[0].action==="fold"&&reviews[0].street==="Preflop";
+ if(preFold){
+  const r=reviews[0];finalHandVerdict={verdict:r.severity==="good"?"GOOD FOLD":"PREFLOP FOLD REVIEW",reason:r.severity==="good"?"You folded preflop, as TAG recommends.":r.analysis};
+  finalHandReviewBusy=false;showHandVerdict();return;
  }
- const deviations=heroReviews.filter(r=>r.severity!=="good"&&r.severity!=="close");
- const close=heroReviews.filter(r=>r.severity==="close");
- const worst=deviations[0];
- const result=net>0?"You won $"+net+".":net<0?"You lost $"+Math.abs(net)+".":"You broke even.";
- const verdict=worst?"TAG STRATEGY DEVIATION":close.length?"CLOSE TAG DECISIONS":"TAG DECISIONS FOLLOWED";
- const detail=worst?("Key decision: "+streetName(worst.street)+" "+worst.action+". "+worst.analysis):close.length?("At least one decision was close. "+close[0].analysis):heroReviews.length?"Your recorded decisions matched the current TAG baseline.":"No graded decisions were recorded.";
- finalHandVerdict={verdict,reason:result+" "+detail+" The result does not determine whether the decision was good."};
+ const weight=r=>({Preflop:0.75,Flop:1,Turn:1.15,River:1.3}[r.street]||1);
+ const score=r=>(r.severity==="good"?0:r.severity==="close"?0.35:1)*weight(r)*Math.max(2,r.amountAtRisk||0);
+ const ordered=reviews.slice().sort((a,b)=>score(b)-score(a));
+ const mistakes=ordered.filter(r=>r.severity!=="good"&&r.severity!=="close");
+ const main=mistakes[0],close=ordered.find(r=>r.severity==="close");
+ const result=net>0?"Won $"+net:net<0?"Lost $"+Math.abs(net):"Broke even";
+ const streetLines=reviews.map(r=>streetName(r.street)+": "+r.verdict+(r.amountAtRisk?" ($"+r.amountAtRisk+" at risk)":"")).join(" · ");
+ const headline=main?"TAG STRATEGY DEVIATION":close?"CLOSE TAG DECISION":"TAG DECISIONS FOLLOWED";
+ const detail=main?"Largest flagged deviation: "+streetName(main.street)+" "+main.action+". "+main.analysis:close?"Close decision: "+streetName(close.street)+" "+close.action+". "+close.analysis:"No deviations flagged by the current TAG rules.";
+ finalHandVerdict={verdict:headline,reason:result+". "+detail+(reviews.length>1?" Decisions: "+streetLines+".":"")};
  finalHandReviewBusy=false;showHandVerdict();
 }
 function finishHand(){

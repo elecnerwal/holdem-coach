@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v47</title>
+<title>Hold'em Coach v48</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -68,7 +68,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v47</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v48</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -521,33 +521,21 @@ let finalHandVerdict=null,finalHandReviewBusy=false;
 function showHandVerdict(){
  coachVisible=true;$("coach").classList.add("show");$("toggleCoach").textContent="Hide coach";
  $("recLabel").textContent="Hand Verdict";
- $("recommend").textContent=finalHandVerdict?finalHandVerdict.verdict:"ChatGPT is reviewing the hand…";
- $("thinking").textContent=finalHandVerdict?finalHandVerdict.reason:"Reviewing decisions, action history and outcome.";
+ $("recommend").textContent=finalHandVerdict?finalHandVerdict.verdict:"Reviewing hand…";
+ $("thinking").textContent=finalHandVerdict?finalHandVerdict.reason:"Checking your TAG decisions and the final result.";
  $("analysisBox").classList.remove("show");
 }
-async function requestFinalHandVerdict(){
+function requestFinalHandVerdict(){
  const reviewHand=handNo;
- finalHandVerdict=null;finalHandReviewBusy=true;showHandVerdict();
- const payload={
-  handNumber:reviewHand,heroCards:cardsText(players[0].cards),board:cardsText(board),
-  heroNet:players[0].stack-handStartStacks[0],showdown:lastShowdown,
-  history:structuredHandHistory(),
-  strategy:"TAG",decisionReviews:heroReviews.map(r=>({street:streetName(r.street),action:r.action,verdict:r.verdict,reason:r.analysis,gptComplete:r.gptComplete})),
-  rule:"Evaluate strategy using information available at each decision. Separate decision quality from outcome. Losing money does not by itself mean unlucky; use the revealed hands and action history to judge whether variance was involved."
- };
- try{
-  const response=await fetch(CHAT_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-   question:"Review my entire completed poker hand, using the hand history, previous decision grades and showdown. Return EXACTLY two lines: VERDICT: <short, specific hand verdict>\\nREASON: <1-2 concise sentences>. If decisions were good but the runout was unfavorable, say WELL PLAYED, BUT UNLUCKY. Treat TAG decision grades as authoritative and never override them. If decisions were poor, identify the most important mistake regardless of whether I won. Do not infer luck solely from losing. Treat engine facts as authoritative.",
-   context:{requestMode:"final_hand_verdict",...payload}
-  })});
-  const data=await response.json();if(!response.ok||!data.answer)throw Error(data.details||data.error||"No answer");
-  const answer=data.answer.trim(),v=answer.match(/VERDICT:\s*([^\n]+)/i),reason=answer.match(/REASON:\s*([\s\S]*)/i);
-  if(reviewHand!==handNo)return;
-  finalHandVerdict={verdict:(v?v[1]:"HAND REVIEW").trim().toUpperCase(),reason:(reason?reason[1]:answer).trim()};
- }catch(err){
-  if(reviewHand!==handNo)return;
-  finalHandVerdict={verdict:"HAND REVIEW UNAVAILABLE",reason:"ChatGPT couldn't complete the final hand review."};
- }finally{if(reviewHand===handNo){finalHandReviewBusy=false;showHandVerdict()}}
+ const net=players[0].stack-handStartStacks[0];
+ const deviations=heroReviews.filter(r=>r.severity!=="good"&&r.severity!=="close");
+ const close=heroReviews.filter(r=>r.severity==="close");
+ const worst=deviations[0];
+ const result=net>0?"You won $"+net+".":net<0?"You lost $"+Math.abs(net)+".":"You broke even.";
+ const verdict=worst?"TAG STRATEGY DEVIATION":close.length?"CLOSE TAG DECISIONS":"TAG DECISIONS FOLLOWED";
+ const detail=worst?("Key decision: "+streetName(worst.street)+" "+worst.action+". "+worst.analysis):close.length?("At least one decision was close. "+close[0].analysis):heroReviews.length?"Your recorded decisions matched the current TAG baseline.":"No graded decisions were recorded.";
+ finalHandVerdict={verdict,reason:result+" "+detail+" The result does not determine whether the decision was good."};
+ finalHandReviewBusy=false;showHandVerdict();
 }
 function finishHand(){
  if(handStartStacks.length){

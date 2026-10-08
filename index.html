@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v44</title>
+<title>Hold'em Coach v45</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -68,7 +68,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v44</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v45</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -379,7 +379,7 @@ function coachData(){
 }
 function seatHTML(i){let p=players[i],hide=i!==0&&!ended;return `<div><strong>${names(i)} · ${pos(i)}${i===button?" · ●":""}</strong></div><div class="muted">$${p.stack}${p.folded?" · FOLDED":p.allin?" · ALL-IN":""}</div><div class="cards">${hide?card(null,true)+card(null,true):p.cards.map(c=>card(c)).join("")}</div><div class="actionText">${p.action||""}</div>${p.streetBet?`<span class="chip">$${p.streetBet} committed</span>`:""}`}
 function renderCoach(){if(ended){showHandVerdict();return}if(paused&&snapshot){$("thinking").textContent=snapshot.txt;$("recLabel").textContent="Verdict";$("recommend").textContent=snapshot.verdict;$("position").textContent=snapshot.p;$("startingStrength").textContent=snapshot.startingStrength?(snapshot.handStrength?snapshot.handStrength.percent.toFixed(1)+"%":"—"):"—";$("equity").textContent=snapshot.e.toFixed(0)+"%";$("needed").textContent=snapshot.c?snapshot.need.toFixed(1)+"%":"—";$("price").textContent="$"+snapshot.c;$("afterPot").textContent="$"+snapshot.finalPot;$("playersLive").textContent=snapshot.live;$("handLabel").textContent=snapshot.hand;$("analysisBox").classList.add("show");$("analysis").textContent=snapshot.analysis}
- else {let d=coachData();$("recLabel").textContent="Recommendation";$("position").textContent=d.p;$("startingStrength").textContent=d.startingStrength?(d.handStrength?d.handStrength.percent.toFixed(1)+"%":"—"):"—";$("equity").textContent=d.e.toFixed(0)+"%";$("needed").textContent=d.c?d.need.toFixed(1)+"%":"—";$("price").textContent="$"+d.c;$("afterPot").textContent="$"+d.finalPot;$("playersLive").textContent=d.live;$("handLabel").textContent=d.hand;$("analysisBox").classList.remove("show");let key=recommendationKey(d);if(gptRecommendation&&gptRecommendationKey===key){$("recommend").textContent=gptRecommendation.verdict;$("thinking").textContent=gptRecommendation.analysis}else{$("recommend").textContent="ChatGPT is reviewing…";$("thinking").textContent="Analyzing the current decision.";requestGPTRecommendation(d,key)}}}
+ else {let d=coachData();$("recLabel").textContent="Recommendation";$("position").textContent=d.p;$("startingStrength").textContent=d.startingStrength?(d.handStrength?d.handStrength.percent.toFixed(1)+"%":"—"):"—";$("equity").textContent=d.e.toFixed(0)+"%";$("needed").textContent=d.c?d.need.toFixed(1)+"%":"—";$("price").textContent="$"+d.c;$("afterPot").textContent="$"+d.finalPot;$("playersLive").textContent=d.live;$("handLabel").textContent=d.hand;$("analysisBox").classList.remove("show");let rec=strategyRecommendation(d);$("recommend").textContent="TAG: "+rec.action.toUpperCase()+(rec.target?" TO $"+rec.target:"");$("thinking").textContent=rec.why}}}
 function render(){for(let i=0;i<10;i++){let el=i===0?$("hero"):$("seat"+i);el.innerHTML=seatHTML(i);el.classList.toggle("turn",!ended&&!paused&&actor===i);el.classList.toggle("folded",players[i].folded)}$("street").textContent=["Preflop","Flop","Turn","River","Showdown"][street];$("pot").textContent="$"+pot;$("turn").textContent=ended?"Hand complete":paused?"Paused — review your decision":`${names(actor)} to act · ${pos(actor)}`;$("board").innerHTML=board.map(c=>card(c,false)).join("")+Array(5-board.length).fill('<div class="card" style="opacity:.12">?</div>').join("");$("history").innerHTML=logs.map(x=>"<div>"+x+"</div>").join("");$("history").scrollTop=$("history").scrollHeight;$("engineState").textContent=ended?"Hand finished":paused?"Waiting for Continue":("Next: "+names(actor)+" · "+pos(actor));let ht=actor===0&&!paused&&!ended;$("actions").style.display=ht?"flex":"none";let c=callAmt(0);$("checkCall").textContent=c?`Call $${c}`:"Check";$("fold").disabled=!c;$("raise").textContent=currentBet?"Raise":"Bet";$("coach").classList.toggle("show",coachVisible);$("skipEnd").style.display=(!ended&&players[0].folded)?"inline-block":"none";if(players[0].cards.length)renderCoach()}
 function log(x){logs.push(x)}
 function commit(i,type,target=0){let p=players[i],c=callAmt(i),potBefore=pot,betBefore=currentBet,position=pos(i),fromBet=p.streetBet;if(type==="fold"){foldSound();p.folded=true;p.action="Fold";acted.add(i);streetActions.push({i,type:"fold",amount:0,potBefore,betBefore,fromBet,toBet:fromBet,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} folds.`);return}if(type==="check"){p.action="Check";acted.add(i);streetActions.push({i,type:"check",amount:0,potBefore,betBefore,fromBet,toBet:fromBet,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} checks.`);return}if(type==="call"){let pay=Math.min(c,p.stack);p.stack-=pay;p.streetBet+=pay;pot+=pay;p.action=`Call ${pay}`;if(!p.stack){p.allin=true;allInSound()}else chipSound();acted.add(i);streetActions.push({i,type:"call",amount:pay,potBefore,betBefore,fromBet,toBet:p.streetBet,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} calls ${pay}.`);return}if(type==="raise"){target=Math.min(target,p.streetBet+p.stack);let old=currentBet,pay=target-p.streetBet;p.stack-=pay;p.streetBet=target;pot+=pay;currentBet=target;minRaise=Math.max(2,target-old);p.action=(old?`Raise to ${target}`:`Bet ${target}`);if(!p.stack){p.allin=true;allInSound()}else chipSound();acted=new Set([i]);streetActions.push({i,type:"raise",amount:pay,target,potBefore,betBefore,fromBet,toBet:target,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} ${p.action.toLowerCase()}.`)}}
@@ -468,44 +468,12 @@ function afterHero(){
  }
 }
 function review(type,d){
- let verdict="",analysis="",severity="good";
- let actionName=type==="raise"?"Raise":type==="call"?"Call":type==="fold"?"Fold":"Check";
- if(street===0){
-  let pc=preClass(),ideal=pc.rec;
-  if((ideal==="Raise"&&type==="raise")||(ideal==="Call"&&type==="call")||(ideal==="Fold"&&type==="fold")||(ideal==="Check"&&type==="check")){
-   verdict=pc.grade==="continue"?"SOLID CONTINUE":"GOOD "+actionName.toUpperCase();analysis=pc.why;
-  } else if(ideal==="Raise"&&type==="call"){verdict="PLAYABLE, BUT TOO PASSIVE";severity="minor";analysis="Calling keeps you in the hand, but the baseline range prefers raising here. "+pc.why}
-  else if(ideal==="Call"&&type==="raise"){verdict="AGGRESSIVE, BUT MARGINAL";severity="minor";analysis="The hand is strong enough to continue, but raising expands the pot with a hand the baseline strategy treats mainly as a call."}
-  else if(ideal==="Fold"&&type!=="fold"){verdict=type==="raise"?"OVER-AGGRESSIVE":"TOO LOOSE";severity="major";analysis="The baseline range prefers folding here. "+pc.why}
-  else if((ideal==="Raise"||ideal==="Call")&&type==="fold"){verdict="TOO TIGHT";severity=pc.grade==="strong"?"major":"minor";analysis="You folded a hand the baseline range wants to continue with. "+pc.why}
-  else {verdict="REASONABLE ALTERNATIVE";severity="minor";analysis="Your action differs from the baseline recommendation, but this is not necessarily a large error."}
- } else {
-  let pc=postClass(d),edge=d.e-d.need;
-  if(type==="call"){
-   if(!d.c){verdict="CHECKED";analysis="No call was required.";severity="good"}
-   else if(pc.quality==="range-aware fold"){verdict="CALL WAS TOO LOOSE";analysis=pc.why+" The displayed raw equity is versus random holdings and should not override the strength shown by the action.";severity=pc.confidence==="high"?"major":"minor"}
-   else if(edge>=8){verdict="GOOD CALL";analysis="Raw equity comfortably cleared the price and the action pattern did not create enough range pressure to reverse the decision.";severity="good"}
-   else if(edge>=0){verdict="THIN BUT DEFENSIBLE CALL";analysis="Raw equity cleared the price only narrowly, and action-inferred ranges make this a close spot.";severity="close"}
-   else if(edge>-5){verdict="MARGINAL CALL";analysis="The immediate raw-equity math is slightly negative and the opponent action does not improve the case for calling.";severity="minor"}
-   else {verdict="CALL WAS TOO LOOSE";analysis="Even against random holdings, raw equity was below the break-even threshold.";severity="major"}
-  } else if(type==="fold"){
-   if(pc.quality==="range-aware fold"){verdict="GOOD FOLD";analysis=pc.why+" Folding is preferred despite the displayed raw equity versus random hands.";severity="good"}
-   else if(edge<-5){verdict="GOOD FOLD";analysis="Even raw equity versus random hands did not meet the price.";severity="good"}
-   else if(edge<5||pc.confidence==="low"){verdict="CLOSE FOLD";analysis="Raw equity is near or above the immediate price, but that estimate uses random holdings. The public action makes a strong continue uncertain.";severity="close"}
-   else {verdict="FOLD MAY BE TOO TIGHT";analysis="Raw equity clears the price and the action pattern is not strong enough for the coach to confidently prefer folding.";severity="minor"}
-  } else if(type==="check"){
-   if(pc.quality==="strong value"){verdict="MISSED VALUE";analysis="Your hand was strong enough that betting was preferred; checking may leave money on the table.";severity="minor"}
-   else {verdict="SOUND CHECK";analysis=pc.why;severity="good"}
-  } else {
-   if(pc.quality==="strong value"){verdict="GOOD VALUE BET";analysis=pc.why;severity="good"}
-   else if(pc.quality==="medium-strength"){verdict="THIN VALUE / PROTECTION";analysis="Betting can be reasonable, but worse hands must call often enough. Checking also has merit.";severity="close"}
-   else if(pc.quality==="drawing or marginal"){verdict="BLUFF DEPENDS ON FOLD EQUITY";analysis="This is not automatically wrong, but the bet needs folds or favorable blockers/range advantage to outperform checking.";severity="close"}
-   else {verdict="BLUFF MAY BE TOO AMBITIOUS";analysis="With low estimated equity, this bet relies heavily on opponents folding. Against calling-heavy ranges it is likely a mistake.";severity="minor"}
-  }
- }
- analysis=actionAnalysis(type,street===0?preClass():postClass(d),d);snapshot={...d,verdict:"ChatGPT is reviewing…",txt:"Analyzing the decision in context.",analysis:"",severity:"pending",action:actionName};heroReviews.push({verdict:"ChatGPT is reviewing…",analysis:"",severity:"pending",action:actionName,street:d.street,e:d.e,need:d.need});paused=true;coachVisible=true;$("toggleCoach").textContent="Hide coach";$("continue").style.display="inline-block";render();getGPTVerdict(d,type)
+ const rec=d.tagRecommendation,grade=STRATEGIES[STRATEGY_MODE].grade(d,type,d.actionTarget,rec);
+ snapshot={...d,verdict:grade.verdict,txt:grade.reason,analysis:grade.reason,severity:grade.severity,action:type};
+ heroReviews.push({verdict:grade.verdict,analysis:grade.reason,severity:grade.severity,gptComplete:true,action:type,street:d.street,e:d.e,need:d.need});
+ paused=true;coachVisible=true;$("toggleCoach").textContent="Hide coach";$("continue").style.display="inline-block";render();
 }
-function heroAction(type,target=0){let d=coachData();d.coachRecommendation=gptRecommendation&&gptRecommendationKey===recommendationKey(d)?{...gptRecommendation}:null;d.actionTarget=target;d.heroStreetBetBefore=players[0].streetBet;commit(0,type,target);review(type,d)}
+function heroAction(type,target=0){let d=coachData();d.tagRecommendation=strategyRecommendation(d);d.actionTarget=target;d.heroStreetBetBefore=players[0].streetBet;commit(0,type,target);review(type,d)}
 
 function exactEquityAt(heroCards, oppHands, b){
  let known=heroCards.concat(...oppHands,b), avail=[];
@@ -564,12 +532,12 @@ async function requestFinalHandVerdict(){
   handNumber:reviewHand,heroCards:cardsText(players[0].cards),board:cardsText(board),
   heroNet:players[0].stack-handStartStacks[0],showdown:lastShowdown,
   history:structuredHandHistory(),
-  decisionReviews:heroReviews.map(r=>({street:streetName(r.street),action:r.action,verdict:r.verdict,reason:r.analysis,gptComplete:r.gptComplete})),
+  strategy:"TAG",decisionReviews:heroReviews.map(r=>({street:streetName(r.street),action:r.action,verdict:r.verdict,reason:r.analysis,gptComplete:r.gptComplete})),
   rule:"Evaluate strategy using information available at each decision. Separate decision quality from outcome. Losing money does not by itself mean unlucky; use the revealed hands and action history to judge whether variance was involved."
  };
  try{
   const response=await fetch(CHAT_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-   question:"Review my entire completed poker hand, using the hand history, previous decision grades and showdown. Return EXACTLY two lines: VERDICT: <short, specific hand verdict>\\nREASON: <1-2 concise sentences>. If decisions were good but the runout was unfavorable, say WELL PLAYED, BUT UNLUCKY. If decisions were poor, identify the most important mistake regardless of whether I won. Do not infer luck solely from losing. Treat engine facts as authoritative.",
+   question:"Review my entire completed poker hand, using the hand history, previous decision grades and showdown. Return EXACTLY two lines: VERDICT: <short, specific hand verdict>\\nREASON: <1-2 concise sentences>. If decisions were good but the runout was unfavorable, say WELL PLAYED, BUT UNLUCKY. Treat TAG decision grades as authoritative and never override them. If decisions were poor, identify the most important mistake regardless of whether I won. Do not infer luck solely from losing. Treat engine facts as authoritative.",
    context:{requestMode:"final_hand_verdict",...payload}
   })});
   const data=await response.json();if(!response.ok||!data.answer)throw Error(data.details||data.error||"No answer");
@@ -718,6 +686,32 @@ function fastCoachContext(mode,decision){
   ]
  };
 }
+const STRATEGY_MODE="TAG"; // Future strategy adapters implement recommend(d) and grade(d,action,target).
+const STRATEGIES={
+ TAG:{
+  recommend(d){
+   const pc=street===0?preClass():postClass(d);
+   let rec=pc.rec.toLowerCase(),action=rec.startsWith("raise")?"raise":rec.startsWith("fold")||rec.startsWith("usually fold")?"fold":rec.startsWith("call")?"call":rec.startsWith("bet")?"raise":rec.startsWith("check")?"check":"check";
+   if(d.c===0&&action==="fold")action="check";
+   if(d.c>0&&action==="check")action="fold";
+   let target=null;
+   if(action==="raise"){
+    if(street===0){const limpers=handActions.filter(a=>a.street===0&&a.i!==0&&a.type==="call").length;target=currentBet>2?Math.max(currentBet+minRaise,currentBet*3):Math.max(6,8+2*limpers)}
+    else target=currentBet?currentBet+Math.max(minRaise,Math.round(pot*.65)):Math.max(2,Math.round(pot*.65));
+    target=Math.min(players[0].streetBet+players[0].stack,target);
+   }
+   return {action,target,why:pc.why,confidence:pc.confidence||"baseline",strategy:"TAG"};
+  },
+  grade(d,type,target,rec){
+   const matched=type===rec.action;
+   const sizingOK=type!=="raise"||!rec.target||Math.abs(target-rec.target)<=Math.max(2,rec.target*.3);
+   const close=type==="check"&&rec.action==="raise"&&street>0;
+   const verdict=matched?(sizingOK?"GOOD "+type.toUpperCase():"SIZING DIFFERS FROM TAG BASELINE"):close?"REASONABLE CHECK":"DEVIATION FROM TAG STRATEGY";
+   return {verdict,reason:matched?(sizingOK?rec.why:"TAG's reference sizing is $"+rec.target+". "+rec.why):"TAG recommends "+rec.action.toUpperCase()+(rec.target?" to $"+rec.target:"")+". "+rec.why,severity:matched?(sizingOK?"good":"minor"):close?"close":"minor"};
+  }
+ }
+};
+function strategyRecommendation(d){return STRATEGIES[STRATEGY_MODE].recommend(d)}
 function recommendationKey(d){
  return [handNo,street,actor,pot,currentBet,d.c,cardsText(board).join(","),handActions.length].join("|");
 }

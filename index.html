@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v43</title>
+<title>Hold'em Coach v44</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -68,7 +68,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v43</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v44</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><button id="toggleCoach">Show coach</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -744,11 +744,12 @@ async function requestGPTRecommendation(d,key){
   })});
   const data=await response.json();if(!response.ok||!data.answer)throw Error(data.details||data.error||"No recommendation");
   let text=data.answer.trim();
-  let rec=(text.match(/RECOMMENDATION:\s*([^\\n]+)/i)||[])[1]?.trim();
-  let reason=(text.match(/REASON:\s*([\\s\\S]*)/i)||[])[1]?.trim();
-  if(!rec){let parts=text.split(/\\n+/);rec=(parts.shift()||"CHATGPT RECOMMENDATION").replace(/^Recommendation:\\s*/i,"").trim();reason=parts.join(" ").trim()}
-  rec=rec.length>80?"CHATGPT RECOMMENDATION":rec;
-  if(gptRecommendationKey===key){gptRecommendation={verdict:rec.toUpperCase(),analysis:reason||"Recommendation based on the current decision."}}
+  let rec=(text.match(/RECOMMENDATION:\s*([^\n]+)/i)||[])[1]?.trim();
+  let reason=(text.match(/REASON:\s*([\s\S]*)/i)||[])[1]?.trim();
+  if(!rec){let parts=text.split(/\n+/);rec=(parts.shift()||"CHATGPT RECOMMENDATION").replace(/^Recommendation:\s*/i,"").trim();reason=parts.join(" ").trim()}
+  rec=rec.replace(/\s*REASON:.*$/i,"").trim();
+  if(rec.length>80)rec="CHATGPT RECOMMENDATION";
+  if(gptRecommendationKey===key){gptRecommendation={verdict:rec.toUpperCase(),analysis:reason||"ChatGPT did not supply a reason."}}
  }catch(err){
   if(gptRecommendationKey===key)gptRecommendation={verdict:"COACH UNAVAILABLE",analysis:"ChatGPT couldn't load a recommendation. You can still use the decision math below."};
  }finally{gptRecommendationBusy=false;if(!ended&&!paused&&actor===0)render()}
@@ -763,6 +764,7 @@ async function getGPTVerdict(d,type){
   rawEquityVsRandomHands:d.e,
   startingHandStrength:d.startingStrength,
   preActionCoachRecommendation:d.coachRecommendation||null,
+  recommendationDisagreedWithAction:d.coachRecommendation?(!d.coachRecommendation.verdict.toUpperCase().includes(actionName.toUpperCase())):null,
   heroStreetBetBefore:d.heroStreetBetBefore||0,
   raiseOrBetTo:d.actionTarget||null,
   chipsAddedByHero:d.actionTarget?Math.max(0,d.actionTarget-(d.heroStreetBetBefore||0)):null,
@@ -780,7 +782,7 @@ async function getGPTVerdict(d,type){
  render();
  try{
   const response=await fetch(CHAT_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
-   question:"Grade my most recent poker decision. OUTPUT EXACTLY TWO LINES. Line 1 must be VERDICT: followed by a short verdict such as GOOD RAISE, RAISE TOO SMALL, RAISE TOO LARGE, SHOULD HAVE FOLDED, GOOD CALL, GOOD CHECK, or CLOSE DECISION. Line 2 must be REASON: followed by 1–2 concise sentences. Do not put anything before VERDICT:. For raises and bets, judge both whether the action and size were appropriate. IMPORTANT: If preActionCoachRecommendation advised this same action and sizing, do not call it too large or too small unless you explicitly identify a factual mistake in that recommendation; acknowledge and correct the earlier coaching error. A preflop raise after limpers is an isolation raise, not an open. Use priorActionsThisStreet and preflopLimpCount. Treat authoritativeHandFacts and all engine numeric decision-math fields as ground truth; never recalculate or contradict them.",
+   question:"Grade my most recent poker decision. OUTPUT EXACTLY TWO LINES. Line 1 must be VERDICT: followed by a short verdict such as GOOD RAISE, RAISE TOO SMALL, RAISE TOO LARGE, SHOULD HAVE FOLDED, GOOD CALL, GOOD CHECK, or CLOSE DECISION. Line 2 must be REASON: followed by 1–2 concise sentences. Do not put anything before VERDICT:. For raises and bets, judge both whether the action and size were appropriate. IMPORTANT: Compare the actual action with preActionCoachRecommendation. If the action differs, explicitly explain why your grading differs from the earlier advice; if it matches, do not criticize it without acknowledging a mistake in the earlier recommendation. Never silently contradict your earlier recommendation. A preflop raise after limpers is an isolation raise, not an open. Use priorActionsThisStreet and preflopLimpCount. Treat authoritativeHandFacts and all engine numeric decision-math fields as ground truth; never recalculate or contradict them.",
    context:fastCoachContext("automatic_decision_verdict",decision)
   })});
   const data=await response.json();

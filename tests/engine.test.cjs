@@ -251,3 +251,12 @@ test('engine legal actions and all-in runout',async()=>{
  players[0].allin=true;
  assert.equal(shouldRunOut(players),true);
 });
+
+test('pot button targets displayed pot rather than pot plus current bet',async()=>{
+ const {potFractionRaiseTarget}=await import('../src/poker-engine.mjs');
+ const state={pot:11,currentBet:2,minRaise:2,streetBet:0,stack:200};
+ assert.equal(potFractionRaiseTarget(state,1),11);
+ assert.equal(potFractionRaiseTarget(state,0.5),6);
+ assert.equal(potFractionRaiseTarget({...state,pot:3},1),4);
+ assert.equal(potFractionRaiseTarget({...state,stack:5},1),5);
+});

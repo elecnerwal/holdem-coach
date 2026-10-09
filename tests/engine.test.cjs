@@ -124,3 +124,19 @@ test('round completion and next actor ignore folded and all-in seats',()=>{
  assert.equal(x.bettingRoundComplete(ps,new Set([0]),10),false);
  assert.equal(x.nextActionableSeat(ps,0),3);
 });
+
+test('deck module: 52 unique cards and draw removes exactly one',async()=>{
+ const {createShuffledDeck,drawCard}=await import('../src/deck.mjs');
+ const deck=createShuffledDeck('23456789TJQKA',['♠','♥','♦','♣']);
+ assert.equal(deck.length,52);
+ assert.equal(new Set(deck.map(c=>c.r+c.s)).size,52);
+ const card=drawCard(deck);
+ assert.ok(card.r&&card.s);
+ assert.equal(deck.length,51);
+});
+test('deck module: deterministic shuffle using injected RNG',async()=>{
+ const {createShuffledDeck}=await import('../src/deck.mjs');
+ const a=createShuffledDeck('23456789TJQKA',['♠','♥','♦','♣'],()=>0.5);
+ const b=createShuffledDeck('23456789TJQKA',['♠','♥','♦','♣'],()=>0.5);
+ assert.deepEqual(a,b);
+});

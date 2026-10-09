@@ -287,3 +287,18 @@ test('showdown returns uncalled chips and conserves stacks',async()=>{
  assert.equal(players[1].stack,0);
  assert.equal(result.payouts.reduce((a,b)=>a+b,0),80);
 });
+
+test('dry side pots prohibit raises and allow board runout',async()=>{
+ const {legalActions,shouldRunOut}=await import('../src/poker-engine.mjs');
+ const players=[{stack:20,streetBet:10,folded:false,allin:false},{stack:0,streetBet:10,folded:false,allin:true}];
+ assert.equal(legalActions({players,currentBet:10,minRaise:10},0).raise,false);
+ assert.equal(shouldRunOut(players,10),true);
+ players[0].streetBet=5;
+ assert.equal(shouldRunOut(players,10),false);
+});
+test('split-pot odd chip goes to first winner left of button',async()=>{
+ const {settleShowdown,eval7,cmp}=await import('../src/poker-engine.mjs');
+ const players=[{folded:false,cards:cards('A♠ K♠')},{folded:false,cards:cards('A♥ K♥')},{folded:true,cards:cards('2♠ 3♠')}];
+ const result=settleShowdown(players,[5,5,5],cards('Q♣ J♦ T♠ 4♣ 6♦'),eval7,cmp,0);
+ assert.deepEqual(Array.from(result.payouts),[7,8,0]);
+});

@@ -330,6 +330,7 @@ test('controller plays a heads-up hand from blinds through showdown',async()=>{
  const deck=createShuffledDeck('23456789TJQKA',['♠','♥','♦','♣'],()=>0.5);
  const state=createHand([100,100],-1,deck,['Hero','TAG']);
  assert.equal(state.pot,3);
+ assert.deepEqual(state.handStartStacks,[100,100]);
  assert.equal(state.actor,state.button);
  const initial=state.players.reduce((n,p)=>n+p.stack,0)+state.pot;
  act(state,state.actor,'call',0,'BTN/SB');
@@ -348,7 +349,7 @@ test('controller plays a heads-up hand from blinds through showdown',async()=>{
  assert.equal(state.ended,true);
  assert.equal(state.street,4);
  assert.equal(state.pot,0);
- assert.equal(result.payouts.reduce((a,b)=>a+b,0),3);
+ assert.equal(result.payouts.reduce((a,b)=>a+b,0),4);
  assert.equal(state.players.reduce((n,p)=>n+p.stack,0),initial);
 });
 test('controller runs out board after heads-up all-in and returns winnings',async()=>{

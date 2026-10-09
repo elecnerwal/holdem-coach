@@ -377,3 +377,10 @@ test('controller awards uncontested blinds and preserves total chips',async()=>{
  assert.equal(state.players.reduce((n,p)=>n+p.stack,0),200);
  assert.equal(state.board.length,0);
 });
+
+test('browser entry point delegates hand lifecycle to controller',()=>{
+ for(const name of ['createHand','controllerAct','controllerRoundComplete','dealNextStreet','controllerRunout','resolveShowdown']){
+  assert.match(html,new RegExp('\\b'+name+'\\('),name);
+ }
+ assert.match(html,/from "\.\/src\/game-controller\.mjs"/);
+});

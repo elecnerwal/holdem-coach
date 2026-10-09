@@ -30,7 +30,7 @@ const symbols=['function canonHand(','function inRange(','function streetName(',
 const tables=['const openRanges=','const TAG_PF='];
 function sandbox(extra={}){
  const ctx=vm.createContext({console,...extra});
- const src='const ranks="23456789TJQKA";const rv=r=>ranks.indexOf(r)+2;const names=i=>i===0?"YOU":"P"+(i+1);\n'+tables.map(extract).join('\n')+'\n'+symbols.map(extract).join('\n');
+ const src=evaluator+'\\nconst names=i=>i===0?"YOU":"P"+(i+1);\\n'+tables.map(extract).join('\\n')+'\\n'+symbols.map(extract).join('\\n');
  vm.runInContext(src,ctx);
  return ctx;
 }

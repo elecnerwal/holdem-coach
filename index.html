@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v60</title>
+<title>Hold'em Coach v61</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -85,8 +85,8 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v60</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
-  <div><button id="toggleCoach">Show coach</button> <button id="openCharts" type="button">Preflop charts</button> <button id="newHand" style="display:none">New hand</button></div>
+  <div><strong>Hold'em Coach v61</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><label style="font-size:12px;color:#aeb9c8;margin-right:6px">Strategy <select id="strategyMode" style="background:#202b38;color:white;border:1px solid #526073;border-radius:7px;padding:8px"><option value="TAG">TAG</option><option value="LOOSE_TAG">Loose TAG</option><option value="GTO" disabled>GTO (coming later)</option></select></label> <button id="toggleCoach">Show coach</button> <button id="openCharts" type="button">Preflop charts</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
   <main class="tablePanel">
@@ -276,7 +276,7 @@ const openRanges={
 function renderPreflopChart(){
  const situation=$("chartSituation").value,position=$("chartPosition").value;
  $("chartPositionWrap").style.display=situation==="rfi"?"":"none";
- const range=situation==="rfi"?(openRanges[position]||[]):(TAG_PF[situation]||[]);
+ const range=STRATEGY_MODE==="LOOSE_TAG"?(situation==="rfi"?(LOOSE_OPEN[position]||openRanges[position]||[]):situation==="overlimp"?LOOSE_OVERLIMP:situation==="isoValue"?LOOSE_ISO:(TAG_PF[situation]||[])):(situation==="rfi"?(openRanges[position]||[]):(TAG_PF[situation]||[]));
  const order="AKQJT98765432",hero=players&&players[0]&&players[0].cards&&players[0].cards.length===2?canonHand(players[0].cards):null;
  const cells=[];
  for(let row=0;row<13;row++)for(let col=0;col<13;col++){
@@ -294,8 +294,8 @@ $("openCharts").onclick=()=>{
   const before=handActions.filter(a=>a.street===0&&a.i!==0);
   const raises=before.filter(a=>a.type==="raise").length;
   const limpers=before.filter(a=>a.type==="call"&&a.betBefore<=2).length;
-  const tag=tagPreflopDecision({c:callAmt(0)});
-  $("chartSituation").value=raises>=2?(tag.ruleId==="TAG-PF-4BET-VALUE"?"fourBet":"defend3Bet"):raises===1?(tag.ruleId==="TAG-PF-3BET-VALUE"?"threeBetLate":"flatRaise"):limpers?(tag.ruleId==="TAG-PF-ISO-VALUE"?"isoValue":"overlimp"):"rfi";
+  const tag=strategyRecommendation(coachData());
+  $("chartSituation").value=raises>=2?(tag.action==="raise"?"fourBet":"defend3Bet"):raises===1?(tag.action==="raise"?"threeBetLate":"flatRaise"):limpers?(tag.action==="raise"?"isoValue":"overlimp"):"rfi";
  }else $("chartSituation").value="rfi";
  renderPreflopChart();$("chartOverlay").classList.add("open");
 };
@@ -439,7 +439,7 @@ function coachData(){
 }
 function seatHTML(i){let p=players[i],hide=i!==0&&!ended;return `<div><strong>${names(i)} · ${pos(i)}${i===button?" · ●":""}</strong></div><div class="muted">$${p.stack}${p.folded?" · FOLDED":p.allin?" · ALL-IN":""}</div><div class="cards">${hide?card(null,true)+card(null,true):p.cards.map(c=>card(c)).join("")}</div><div class="actionText">${ended&&handWinnerIds.includes(i)?"WINNER"+(board.length>=3?" · "+winnerMadeHand(i):" · by folds"):p.action||""}</div>${p.streetBet?`<span class="chip">$${p.streetBet} committed</span>`:""}`}
 function renderCoach(){if(ended){showHandVerdict();return}$("decisionMathBox").style.display="";if(paused&&snapshot){$("thinking").textContent=snapshot.txt;$("recLabel").textContent="Verdict";$("recommend").textContent=snapshot.verdict;$("position").textContent=snapshot.p;$("startingStrength").textContent=snapshot.startingStrength?(snapshot.handStrength?snapshot.handStrength.percent.toFixed(1)+"%":"—"):"—";$("equity").textContent=snapshot.e.toFixed(0)+"%";$("needed").textContent=snapshot.c?snapshot.need.toFixed(1)+"%":"—";$("price").textContent="$"+snapshot.c;$("afterPot").textContent="$"+snapshot.finalPot;$("playersLive").textContent=snapshot.live;$("handLabel").textContent=snapshot.hand;$("analysisBox").classList.add("show");$("analysis").textContent=snapshot.analysis}
- else {let d=coachData();$("recLabel").textContent="Recommendation";$("position").textContent=d.p;$("startingStrength").textContent=d.startingStrength?(d.handStrength?d.handStrength.percent.toFixed(1)+"%":"—"):"—";$("equity").textContent=d.e.toFixed(0)+"%";$("needed").textContent=d.c?d.need.toFixed(1)+"%":"—";$("price").textContent="$"+d.c;$("afterPot").textContent="$"+d.finalPot;$("playersLive").textContent=d.live;$("handLabel").textContent=d.hand;$("analysisBox").classList.remove("show");let rec=strategyRecommendation(d);$("recommend").textContent="TAG: "+rec.action.toUpperCase()+(rec.target?" TO $"+rec.target:"");$("thinking").textContent=rec.why+" ["+rec.ruleId+"]"}}
+ else {let d=coachData();$("recLabel").textContent="Recommendation";$("position").textContent=d.p;$("startingStrength").textContent=d.startingStrength?(d.handStrength?d.handStrength.percent.toFixed(1)+"%":"—"):"—";$("equity").textContent=d.e.toFixed(0)+"%";$("needed").textContent=d.c?d.need.toFixed(1)+"%":"—";$("price").textContent="$"+d.c;$("afterPot").textContent="$"+d.finalPot;$("playersLive").textContent=d.live;$("handLabel").textContent=d.hand;$("analysisBox").classList.remove("show");let rec=strategyRecommendation(d);$("recommend").textContent=(STRATEGY_MODE==="LOOSE_TAG"?"LOOSE TAG":"TAG")+": "+rec.action.toUpperCase()+(rec.target?" TO $"+rec.target:"");$("thinking").textContent=rec.why+" ["+rec.ruleId+"]"}}
 function render(){for(let i=0;i<10;i++){let el=i===0?$("hero"):$("seat"+i);el.innerHTML=seatHTML(i);el.classList.toggle("turn",!ended&&!paused&&actor===i);el.classList.toggle("folded",players[i].folded);el.classList.toggle("winner",ended&&handWinnerIds.includes(i))}$("street").textContent=["Preflop","Flop","Turn","River","Showdown"][street];$("pot").textContent="$"+pot;$("turn").textContent=ended?"Hand complete":paused?"Paused — review your decision":`${names(actor)} to act · ${pos(actor)}`;$("board").innerHTML=board.map(c=>card(c,false)).join("")+Array(5-board.length).fill('<div class="card" style="opacity:.12">?</div>').join("");$("history").innerHTML=logs.map(x=>"<div>"+x+"</div>").join("");$("history").scrollTop=$("history").scrollHeight;$("engineState").textContent=ended?"Hand finished":paused?"Waiting for Continue":("Next: "+names(actor)+" · "+pos(actor));let ht=actor===0&&!paused&&!ended;$("actions").style.display=ht?"flex":"none";let c=callAmt(0);$("checkCall").textContent=c?`Call $${c}`:"Check";$("fold").disabled=!c;$("raise").textContent=currentBet?"Raise":"Bet";$("coach").classList.toggle("show",coachVisible);$("skipEnd").style.display=(!ended&&players[0].folded)?"inline-block":"none";if(players[0].cards.length)renderCoach()}
 function log(x){logs.push(x)}
 function commit(i,type,target=0){let p=players[i],c=callAmt(i),potBefore=pot,betBefore=currentBet,position=pos(i),fromBet=p.streetBet;if(type==="fold"){foldSound();p.folded=true;p.action="Fold";acted.add(i);streetActions.push({i,type:"fold",amount:0,potBefore,betBefore,fromBet,toBet:fromBet,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} folds.`);return}if(type==="check"){p.action="Check";acted.add(i);streetActions.push({i,type:"check",amount:0,potBefore,betBefore,fromBet,toBet:fromBet,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} checks.`);return}if(type==="call"){let pay=Math.min(c,p.stack);p.stack-=pay;p.streetBet+=pay;pot+=pay;p.action=`Call ${pay}`;if(!p.stack){p.allin=true;allInSound()}else chipSound();acted.add(i);streetActions.push({i,type:"call",amount:pay,potBefore,betBefore,fromBet,toBet:p.streetBet,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} calls ${pay}.`);return}if(type==="raise"){target=Math.min(target,p.streetBet+p.stack);let old=currentBet,pay=target-p.streetBet;p.stack-=pay;p.streetBet=target;pot+=pay;currentBet=target;minRaise=Math.max(2,target-old);p.action=(old?`Raise to ${target}`:`Bet ${target}`);if(!p.stack){p.allin=true;allInSound()}else chipSound();acted=new Set([i]);streetActions.push({i,type:"raise",amount:pay,target,potBefore,betBefore,fromBet,toBet:target,potAfter:pot,position,street,board:board.map(x=>({...x}))});handActions.push(streetActions[streetActions.length-1]);log(`${names(i)} ${p.action.toLowerCase()}.`)}}
@@ -604,7 +604,7 @@ function requestFinalHandVerdict(){
  const reviews=heroReviews.slice();
  const preFold=reviews.length===1&&reviews[0].action==="fold"&&reviews[0].street==="Preflop";
  if(preFold){
-  const r=reviews[0];finalHandVerdict={verdict:r.severity==="good"?"GOOD FOLD":"PREFLOP FOLD REVIEW",reason:r.severity==="good"?"You folded preflop, as TAG recommends.":r.analysis};
+  const r=reviews[0];finalHandVerdict={verdict:r.severity==="good"?"GOOD FOLD":"PREFLOP FOLD REVIEW",reason:r.severity==="good"?"You folded preflop, as "+(STRATEGY_MODE==="LOOSE_TAG"?"Loose TAG":"TAG")+" recommends.":r.analysis};
   finalHandReviewBusy=false;showHandVerdict();return;
  }
  const weight=r=>({Preflop:0.75,Flop:1,Turn:1.15,River:1.3}[r.street]||1);
@@ -614,7 +614,7 @@ function requestFinalHandVerdict(){
  const main=mistakes[0],close=ordered.find(r=>r.severity==="close");
  const result=net>0?"Won $"+net:net<0?"Lost $"+Math.abs(net):"Broke even";
  const streetLines=reviews.map(r=>streetName(r.street)+": "+r.verdict+(r.amountAtRisk?" ($"+r.amountAtRisk+" at risk)":"")).join(" · ");
- const headline=main?"TAG STRATEGY DEVIATION":close?"CLOSE TAG DECISION":"TAG DECISIONS FOLLOWED";
+ const strategyLabel=STRATEGY_MODE==="LOOSE_TAG"?"LOOSE TAG":"TAG";const headline=main?strategyLabel+" STRATEGY DEVIATION":close?"CLOSE "+strategyLabel+" DECISION":strategyLabel+" DECISIONS FOLLOWED";
  const detail=main?"Largest flagged deviation: "+streetName(main.street)+" "+main.action+". "+main.analysis:close?"Close decision: "+streetName(close.street)+" "+close.action+". "+close.analysis:"No deviations flagged by the current TAG rules.";
  finalHandVerdict={verdict:headline,reason:result+". "+detail+(reviews.length>1?" Decisions: "+streetLines+".":"")};
  finalHandReviewBusy=false;showHandVerdict();
@@ -800,7 +800,7 @@ function tagPreflopDecision(d){
  if(inRange(h,openRanges[p]||[]))return out("Raise","TAG-PF-RFI-"+p,"Open-raise this hand from "+p+" under the full-ring TAG chart.");
  return out(hasPrice?"Fold":"Check","TAG-PF-RFI-FOLD-"+p,"Outside the full-ring TAG opening range for "+p+".");
 }
-const STRATEGY_MODE="TAG"; // Future strategy adapters implement recommend(d) and grade(d,action,target).
+let STRATEGY_MODE="TAG"; // Strategy adapter selected by player.
 const STRATEGIES={
  TAG:{
   recommend(d){
@@ -825,7 +825,46 @@ const STRATEGIES={
   }
  }
 };
+// Loose TAG broadens late-position opens and isolation/overlimp candidates.
+// It deliberately shares TAG postflop logic until a separate postflop module is validated.
+const LOOSE_OPEN={
+ HJ:["22+","A2s+","K7s+","Q8s+","J8s+","T8s+","98s","87s","76s","65s","A9o+","KTo+","QTo+","JTo"],
+ CO:["22+","A2s+","K5s+","Q7s+","J7s+","T7s+","97s+","86s+","75s+","65s","54s","A7o+","K9o+","Q9o+","J9o+","T9o"],
+ BTN:["22+","A2s+","K2s+","Q5s+","J6s+","T6s+","96s+","85s+","74s+","64s+","53s+","43s","A2o+","K7o+","Q8o+","J8o+","T8o+","98o"],
+ SB:["22+","A2s+","K5s+","Q7s+","J7s+","T7s+","97s+","86s+","76s","65s","54s","A7o+","K9o+","Q9o+","J9o+"]
+};
+const LOOSE_ISO=["66+","A8s+","KTs+","QTs+","JTs","T9s","98s","A9o+","KJo+","QJo"];
+const LOOSE_OVERLIMP=["22+","A2s+","K7s+","Q8s+","J8s+","T8s+","98s","87s","76s","65s","54s","AJo","KQo"];
+STRATEGIES.LOOSE_TAG={
+ recommend(d){
+  const base=STRATEGIES.TAG.recommend(d);
+  if(street!==0)return {...base,strategy:"LOOSE_TAG",ruleId:"LT-"+base.ruleId,why:base.why+" (Loose TAG currently uses the TAG postflop baseline.)"};
+  const h=canonHand(players[0].cards),p=pos(0);
+  const prior=handActions.filter(a=>a.street===0&&a.i!==0);
+  const raises=prior.filter(a=>a.type==="raise");
+  const limpers=prior.filter(a=>a.type==="call"&&a.betBefore<=2);
+  let action=base.action,why=base.why,ruleId=base.ruleId,target=base.target;
+  if(!raises.length&&limpers.length&&inRange(h,LOOSE_ISO)){
+   action="raise";ruleId="LT-PF-ISO";why="Loose TAG isolates limpers with a wider value range.";target=Math.max(8,8+2*limpers.length);
+  }else if(!raises.length&&limpers.length&&p!=="SB"&&d.c>0&&inRange(h,LOOSE_OVERLIMP)&&action==="fold"){
+   action="call";ruleId="LT-PF-OVERLIMP";why="Loose TAG can overlimp this playable hand at a small price.";target=null;
+  }else if(!raises.length&&!limpers.length&&LOOSE_OPEN[p]&&inRange(h,LOOSE_OPEN[p])&&action==="fold"){
+   action="raise";ruleId="LT-PF-OPEN-"+p;why="Wider late-position opening range in Loose TAG.";target=Math.max(6,8);
+  }
+  if(action==="raise")target=Math.min(players[0].streetBet+players[0].stack,target||8);
+  return {action,target,why,ruleId,confidence:"provisional",strategy:"LOOSE_TAG"};
+ },
+ grade(d,type,target,rec){
+  const g=STRATEGIES.TAG.grade(d,type,target,rec);
+  return {...g,verdict:g.verdict.replace(/TAG/g,"LOOSE TAG"),reason:g.reason.replace(/TAG/g,"Loose TAG")};
+ }
+};
 function strategyRecommendation(d){return STRATEGIES[STRATEGY_MODE].recommend(d)}
+$("strategyMode").onchange=()=>{
+ STRATEGY_MODE=$("strategyMode").value;
+ if(!ended&&!paused)renderCoach();
+ if($("chartOverlay").classList.contains("open"))renderPreflopChart();
+};
 function recommendationKey(d){
  return [handNo,street,actor,pot,currentBet,d.c,cardsText(board).join(","),handActions.length].join("|");
 }

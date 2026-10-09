@@ -214,3 +214,40 @@ test('engine applies capped call to stack, bet and all-in flag',async()=>{
  assert.equal(player.allin,true);
  assert.equal(player.action,'Call 7');
 });
+
+test('engine betting actions mutate stacks, pot, acted and history',async()=>{
+ const {applyBettingAction}=await import('../src/poker-engine.mjs');
+ const players=[{stack:100,streetBet:0,folded:false,allin:false,action:''},{stack:100,streetBet:0,folded:false,allin:false,action:''}];
+ const state={players,board:[],street:1,pot:10,currentBet:0,minRaise:2,acted:new Set(),streetActions:[],handActions:[],position:'BTN'};
+ const bet=applyBettingAction(state,0,'raise',20);
+ assert.equal(bet.record.amount,20);assert.equal(state.pot,30);assert.equal(players[0].stack,80);
+ assert.equal(state.currentBet,20);assert.equal(state.minRaise,20);
+ const call=applyBettingAction(state,1,'call');
+ assert.equal(call.record.amount,20);assert.equal(players[1].stack,80);assert.equal(state.pot,50);
+ assert.equal(state.handActions.length,2);
+ assert.equal(state.acted.size,2);
+});
+test('engine rejects invalid check and below-minimum raise without changing chips',async()=>{
+ const {applyBettingAction}=await import('../src/poker-engine.mjs');
+ const players=[{stack:100,streetBet:0,folded:false,allin:false,action:''}];
+ const state={players,board:[],street:0,pot:12,currentBet:8,minRaise:6,acted:new Set(),streetActions:[],handActions:[],position:'UTG'};
+ assert.throws(()=>applyBettingAction(state,0,'check'));
+ assert.throws(()=>applyBettingAction(state,0,'raise',10));
+ assert.equal(players[0].stack,100);assert.equal(state.pot,12);assert.equal(state.handActions.length,0);
+});
+test('engine resolves uncontested pots without card disclosure',async()=>{
+ const {settleUncontested}=await import('../src/poker-engine.mjs');
+ const state={players:[{stack:90,folded:false},{stack:95,folded:true}],pot:15,ended:false};
+ assert.deepEqual(settleUncontested(state),{winner:0,amount:15});
+ assert.equal(state.players[0].stack,105);assert.equal(state.pot,0);assert.equal(state.ended,true);
+});
+test('engine legal actions and all-in runout',async()=>{
+ const {legalActions,shouldRunOut}=await import('../src/poker-engine.mjs');
+ const players=[{stack:3,streetBet:2,folded:false,allin:false},{stack:0,streetBet:5,folded:false,allin:true}];
+ const state={players,currentBet:5,minRaise:5};
+ const legal=legalActions(state,0);
+ assert.equal(legal.check,false);assert.equal(legal.call,true);assert.equal(legal.raise,false);
+ assert.equal(shouldRunOut(players),false);
+ players[0].allin=true;
+ assert.equal(shouldRunOut(players),true);
+});

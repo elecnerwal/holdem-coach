@@ -384,3 +384,16 @@ test('browser entry point delegates hand lifecycle to controller',()=>{
  }
  assert.match(html,/from "\.\/src\/game-controller\.mjs"/);
 });
+
+test('bot AI uses only own cards and public betting state',async()=>{
+ const {decideBotAction}=await import('../src/bot-ai.mjs');
+ const base={cards:cards('A♠ A♥'),board:[],street:0,pot:3,currentBet:2,minRaise:2,streetBet:0,stack:198,opponentCount:2,styleName:'TAG'};
+ assert.deepEqual(decideBotAction(base,()=>0),['raise',4]);
+ assert.deepEqual(decideBotAction({...base,cards:cards('7♣ 2♦')},()=>0),['fold',0]);
+ assert.deepEqual(decideBotAction({...base,cards:cards('7♣ 2♦'),currentBet:0,streetBet:0},()=>0.99),['check',0]);
+ assert.deepEqual(decideBotAction({...base,cards:cards('7♣ 2♦'),currentBet:0,streetBet:0},()=>0.99),['check',0]);
+});
+test('browser delegates bot decisions to standalone module',()=>{
+ assert.match(html,/from "\.\/src\/bot-ai\.mjs"/);
+ assert.match(html,/return decideBotAction\(/);
+});

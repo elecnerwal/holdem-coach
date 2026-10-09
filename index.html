@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v98</title>
+<title>Hold'em Coach v99</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -91,7 +91,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v98</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v99</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><label style="font-size:12px;color:#aeb9c8;margin-right:6px">Strategy <select id="strategyMode" style="background:#202b38;color:white;border:1px solid #526073;border-radius:7px;padding:8px"><option value="TAG">TAG</option><option value="LOOSE_TAG">Loose TAG</option><option value="GTO" disabled>GTO (coming later)</option></select></label> <button id="toggleCoach">Show coach</button> <button id="openCharts" type="button">Preflop charts</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -812,12 +812,19 @@ async function sendChat(){
   // Keep the current user question at the beginning of the request. The Worker
   // may cap prompt length; long instructions/history previously pushed it out.
   const context=chatContext();
+  context.currentDecisionStatus=ended?"Hand completed":paused?"Paused after a completed action":actor===0?"Hero is currently facing a decision and has NOT acted yet":"Waiting for another player's action";
+  context.heroHasActedThisStreet=handActions.some(a=>a.street===street&&a.i===0);
+  context.authoritativeCurrentRecommendation=(!ended&&!paused&&actor===0)?(()=>{const rec=strategyRecommendation(coachData());return {strategy:STRATEGY_MODE,action:rec.action,raiseTo:rec.target||null,rationale:rec.why,ruleId:rec.ruleId,policy:"This is the in-app recommendation, not necessarily the only defensible poker action."}})():null;
+  context.currentDecisionActions=handActions.filter(a=>a.street===street).map(a=>({player:names(a.i),action:a.type,amount:a.amount||0}));
   context.chatHistory=chatTurns.slice(-4).map(x=>({role:x.role,text:x.text.slice(0,350)}));
   context.chatInstructions=[
    "Answer the user's latest question first, directly and accurately.",
    "Do not repeat a prior hand verdict unless the latest question asks about it.",
    "For general poker-rule questions, answer the rule before discussing this hand.",
    "Use authoritative engine rankings for card-specific comparisons.",
+   "Do not claim Hero folded, called, or raised on the current street unless currentDecisionActions contains that actual Hero action. Hero is awaiting a decision when currentDecisionStatus says so.",
+   "When discussing a current decision, acknowledge authoritativeCurrentRecommendation. If you favor a different action, explain why as an alternative, rather than contradicting the in-app coach without explanation.",
+   "Describe board cards in their actual order and suits. Do not invent opponent hole cards, actions, or outcomes.",
    "Be concise (2-3 sentences unless more detail is requested)."
   ];
   const question=q.slice(0,1500);

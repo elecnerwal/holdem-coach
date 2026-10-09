@@ -17,3 +17,21 @@ test('poker state is session-owned, without sync mirrors',()=>{
  assert.match(script[1],/gameSession\.state\.players/);
  assert.doesNotMatch(script[1],/let deck=\[\], players=/);
 });
+
+test('session preserves one authoritative state through actions and showdown',async()=>{
+ const {createGameSession}=await import('../src/game-session.mjs');
+ const session=createGameSession();
+ const hand={players:[{stack:200},{stack:200}],board:[],deck:[],button:0,street:0,pot:3,currentBet:2,minRaise:2,actor:1,acted:new Set(),raiseLocked:new Set(),streetActions:[],handActions:[],handStartStacks:[200,200],ended:false};
+ const active=session.begin(hand);
+ assert.strictEqual(session.state,active);
+ session.setActor(0);
+ assert.equal(active.actor,0);
+ active.players[0].stack=198;active.players[1].stack=199;
+ session.clearPot();
+ assert.equal(session.state.pot,0);
+ session.finish();
+ assert.equal(active.ended,true);
+ session.assertFinite();
+ active.players[0].stack=NaN;
+ assert.throws(()=>session.assertFinite(),/Invalid stack/);
+});

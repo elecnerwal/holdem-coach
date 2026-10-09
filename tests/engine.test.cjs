@@ -171,3 +171,23 @@ test('hand setup: short stack blind is capped and marked all-in',async()=>{
  assert.equal(result.players[1].allin,true);assert.equal(result.players[2].allin,true);
  assert.equal(result.actor,3);
 });
+
+test('street transition: flop deals three, resets bets and picks SB',async()=>{
+ const {advanceStreet}=await import('../src/street-transition.mjs');
+ const players=Array.from({length:4},()=>({folded:false,allin:false,streetBet:10,action:'Call'}));
+ const deck=Array.from({length:20},(_,i)=>({r:String(i),s:'x'}));
+ const next=advanceStreet({street:0,players,board:[],deck,button:0});
+ assert.equal(next.street,1);assert.equal(next.board.length,3);assert.equal(deck.length,17);
+ assert.equal(next.actor,1);assert.equal(next.currentBet,0);assert.equal(next.minRaise,2);
+ assert.equal(next.players,players);assert.ok(players.every(p=>p.streetBet===0&&p.action===''));
+});
+test('street transition: turn and river each deal one and skip all-in seats',async()=>{
+ const {advanceStreet}=await import('../src/street-transition.mjs');
+ const players=[{folded:false,allin:false,streetBet:0},{folded:false,allin:true,streetBet:0},{folded:true,allin:false,streetBet:0},{folded:false,allin:false,streetBet:0}];
+ const deck=Array.from({length:10},(_,i)=>({r:String(i),s:'x'}));
+ const flop=Array.from({length:3},(_,i)=>({r:'F'+i,s:'x'}));
+ const turn=advanceStreet({street:1,players,board:flop,deck,button:0});
+ assert.equal(turn.street,2);assert.equal(turn.board.length,4);assert.equal(turn.actor,3);
+ const river=advanceStreet({street:2,players,board:turn.board,deck,button:0});
+ assert.equal(river.street,3);assert.equal(river.board.length,5);assert.equal(river.dealCount,1);
+});

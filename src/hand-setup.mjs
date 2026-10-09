@@ -22,5 +22,5 @@ export function initializeHand(stacks,button,deck,styles=[]){
  for(const [seat,amount,label] of [[sb,sbPay,"SB"],[bb,bbPay,"BB"]]){
   const p=players[seat];p.stack-=amount;p.streetBet=amount;p.action=label+" $"+amount;if(!p.stack)p.allin=true;
  }
- return {players,sb,bb,sbPay,bbPay,pot:sbPay+bbPay,currentBet:Math.max(sbPay,bbPay),actor:active.length===2?sb:clockwise.find(i=>i!==sb&&i!==bb&&players[i].stack>0)??-1};
+ return {players,sb,bb,sbPay,bbPay,pot:sbPay+bbPay,currentBet:Math.max(sbPay,bbPay),actor:active.length===2?sb:(()=>{for(let n=1;n<=players.length;n++){const i=(bb+n)%players.length;if(!players[i].folded&&!players[i].allin)return i}return -1})()};
 }

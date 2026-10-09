@@ -247,7 +247,7 @@ test('engine legal actions and all-in runout',async()=>{
  const state={players,currentBet:5,minRaise:5};
  const legal=legalActions(state,0);
  assert.equal(legal.check,false);assert.equal(legal.call,true);assert.equal(legal.raise,false);
- assert.equal(shouldRunOut(players),false);
+ assert.equal(shouldRunOut(players,5),false);
  players[0].allin=true;
  assert.equal(shouldRunOut(players),true);
 });

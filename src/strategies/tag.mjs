@@ -25,21 +25,21 @@ const TAG_PF={
 export {openRanges,TAG_PF};
 export function createTagStrategy(ctx){
  const {canonHand,pos,inRange,postClass}=ctx;
- const players=ctx.players,handActions=ctx.handActions;
+
  const state=()=>ctx.state();
  function tagPreflopDecision(d){
- const h=canonHand(players[0].cards),p=pos(0),prior=handActions.filter(a=>a.street===0&&a.i!==0);
+ const h=canonHand(ctx.players[0].cards),p=pos(0),prior=ctx.handActions.filter(a=>a.street===0&&a.i!==0);
  const raises=prior.filter(a=>a.type==="raise"),limpers=prior.filter(a=>a.type==="call"&&a.betBefore<=2);
  const isLate=["HJ","CO","BTN"].includes(p),hasPrice=d.c>0;
  const out=(rec,ruleId,why,confidence="baseline")=>({rec,ruleId,why,confidence});
  if(raises.length>=2){
   if(inRange(h,TAG_PF.fourBet))return out("Raise","TAG-PF-4BET-VALUE","Premium hand suitable for a value four-bet.");
-  if(inRange(h,TAG_PF.defend3Bet)&&d.c<=Math.max(24,players[0].stack*.15))return out("Call","TAG-PF-3BET-DEFEND","Continue cautiously versus a three-bet with a strong hand.");
+  if(inRange(h,TAG_PF.defend3Bet)&&d.c<=Math.max(24,ctx.players[0].stack*.15))return out("Call","TAG-PF-3BET-DEFEND","Continue cautiously versus a three-bet with a strong hand.");
   return out(hasPrice?"Fold":"Check","TAG-PF-3BET-FOLD","Avoid defending marginal hands against heavy preflop aggression.");
  }
  if(raises.length===1){
   if(inRange(h,isLate?TAG_PF.threeBetLate:TAG_PF.threeBet))return out("Raise","TAG-PF-3BET-VALUE","Three-bet a strong value range against the opener.");
-  if(inRange(h,TAG_PF.flatRaise)&&d.c<=Math.min(16,players[0].stack*.1))return out("Call","TAG-PF-CALL-OPEN","This hand can continue at a manageable price; position and opener range still matter.");
+  if(inRange(h,TAG_PF.flatRaise)&&d.c<=Math.min(16,ctx.players[0].stack*.1))return out("Call","TAG-PF-CALL-OPEN","This hand can continue at a manageable price; position and opener range still matter.");
   return out(hasPrice?"Fold":"Check","TAG-PF-FOLD-OPEN","Outside the baseline defense range against this raise.");
  }
  if(limpers.length){
@@ -60,9 +60,9 @@ export function createTagStrategy(ctx){
    if(d.c>0&&action==="check")action="fold";
    let target=null;
    if(action==="raise"){
-    if(street===0){const limpers=handActions.filter(a=>a.street===0&&a.i!==0&&a.type==="call").length;target=currentBet>2?Math.max(currentBet+minRaise,currentBet*3):Math.max(6,8+2*limpers)}
+    if(street===0){const limpers=ctx.handActions.filter(a=>a.street===0&&a.i!==0&&a.type==="call").length;target=currentBet>2?Math.max(currentBet+minRaise,currentBet*3):Math.max(6,8+2*limpers)}
     else target=currentBet?currentBet+Math.max(minRaise,Math.round(pot*.65)):Math.max(2,Math.round(pot*.65));
-    target=Math.min(players[0].streetBet+players[0].stack,target);
+    target=Math.min(ctx.players[0].streetBet+ctx.players[0].stack,target);
    }
    return {action,target,why:pc.why,ruleId:pc.ruleId||(street===0?"TAG-PF-OTHER":"TAG-POST-"+pc.quality),confidence:pc.confidence||"baseline",strategy:"TAG"};
   },

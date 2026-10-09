@@ -1,5 +1,6 @@
 // Table UI: seat cards, action labels, board, history, and betting controls.
 // Game state and poker rules are injected; this module never mutates the game engine.
+export function renderCard(c,back=false){if(back)return '<div class="card back">♠</div>';return `<div class="card ${"♥♦".includes(c.s)?"red":""}">${c.r}${c.s}</div>`}
 export function createTableUI({getState,$,names,pos,card,callAmt,legalActions,renderCoach,handNames,eval7}){
  function seatHTML(i){const {players,street,button,ended,handWinnerIds,board}=getState();let p=players[i],hide=i!==0&&(street!==4||p.folded);return `<div><strong>${names(i)} · ${pos(i)}${i===button?" · ●":""}</strong></div><div class="muted">$${p.stack}${p.folded?" · FOLDED":p.allin?" · ALL-IN":""}</div><div class="cards">${hide?card(null,true)+card(null,true):p.cards.map(c=>card(c)).join("")}</div><div class="actionText">${ended&&handWinnerIds.includes(i)?"WINNER"+(street===4&&board.length>=3?" · "+handNames[eval7(p.cards.concat(board))[0]]:""):p.action||""}</div><span class="chip" style="${p.streetBet?"":"visibility:hidden"}">$${p.streetBet||0} committed</span>`}
  function render(){const {players,board,street,pot,actor,paused,ended,handWinnerIds,logs,currentBet,minRaise,raiseLocked,coachVisible}=getState();

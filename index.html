@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v91</title>
+<title>Hold'em Coach v92</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -22,7 +22,13 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 .coach{display:none}.coach.show{display:block}.box h3{margin:0 0 10px;font-size:16px}.coachHead{display:flex;justify-content:space-between;gap:8px}.rule{border-top:1px solid var(--border);margin:12px 0}.label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}.recommend{font-weight:800;margin-top:4px}.math{display:grid;grid-template-columns:1fr 1fr;gap:12px}.num{font-size:20px;font-weight:800}.analysis{display:none}.analysis.show{display:block}.good{color:var(--good)}.bad{color:var(--bad)}
 
 .tenTable{border-radius:42%;min-height:620px;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:auto auto 1fr auto auto;gap:8px}
-.tenTable .seat{min-width:0;font-size:12px;padding:7px}.tenTable .card{width:34px;height:47px;font-size:14px}
+.tenTable .seat{min-width:0;font-size:12px;padding:7px}
+/* Reserve the betting-chip line so actions never resize a seat or its grid row. */
+.tenTable{grid-template-rows:repeat(2,minmax(0,1fr)) minmax(0,1.35fr) repeat(2,minmax(0,1fr))}
+.tenTable .seat{box-sizing:border-box;min-height:0;min-width:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.tenTable .seat .actionText{width:100%;min-height:17px;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tenTable .seat .chip{display:block;box-sizing:border-box;width:max-content;max-width:100%;height:19px;line-height:13px;flex-shrink:0;white-space:nowrap}
+.tenTable .card{width:34px;height:47px;font-size:14px}
 #seat5{grid-column:2;grid-row:1}#seat6{grid-column:3;grid-row:1}#seat7{grid-column:4;grid-row:1}
 #seat4{grid-column:1;grid-row:2}#seat8{grid-column:5;grid-row:2}
 #seat3{grid-column:1;grid-row:4}#seat9{grid-column:5;grid-row:4}
@@ -85,7 +91,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v89</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v92</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><label style="font-size:12px;color:#aeb9c8;margin-right:6px">Strategy <select id="strategyMode" style="background:#202b38;color:white;border:1px solid #526073;border-radius:7px;padding:8px"><option value="TAG">TAG</option><option value="LOOSE_TAG">Loose TAG</option><option value="GTO" disabled>GTO (coming later)</option></select></label> <button id="toggleCoach">Show coach</button> <button id="openCharts" type="button">Preflop charts</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -353,7 +359,7 @@ function coachData(){
  }
  return {c:ccall,need,e,p,txt,rec,quality,why,startingStrength:startingHandStrength(players[0].cards),handStrength:currentHandStrength(),finalPot:pot+ccall,hand:heroHand(),live:live().length,street:["Preflop","Flop","Turn","River"][street]};
 }
-function seatHTML(i){let p=players[i],hide=i!==0&&(street!==4||p.folded);return `<div><strong>${names(i)} · ${pos(i)}${i===button?" · ●":""}</strong></div><div class="muted">$${p.stack}${p.folded?" · FOLDED":p.allin?" · ALL-IN":""}</div><div class="cards">${hide?card(null,true)+card(null,true):p.cards.map(c=>card(c)).join("")}</div><div class="actionText">${ended&&handWinnerIds.includes(i)?"WINNER"+(street===4&&board.length>=3?" · "+winnerMadeHand(i):" · by folds"):p.action||""}</div>${p.streetBet?`<span class="chip">$${p.streetBet} committed</span>`:""}`}
+function seatHTML(i){let p=players[i],hide=i!==0&&(street!==4||p.folded);return `<div><strong>${names(i)} · ${pos(i)}${i===button?" · ●":""}</strong></div><div class="muted">$${p.stack}${p.folded?" · FOLDED":p.allin?" · ALL-IN":""}</div><div class="cards">${hide?card(null,true)+card(null,true):p.cards.map(c=>card(c)).join("")}</div><div class="actionText">${ended&&handWinnerIds.includes(i)?"WINNER"+(street===4&&board.length>=3?" · "+winnerMadeHand(i):" · by folds"):p.action||""}</div><span class="chip" style="${p.streetBet?"":"visibility:hidden"}">${p.streetBet||0} committed</span>`}
 function renderCoach(){if(ended){showHandVerdict();return}$("decisionMathBox").style.display="";if(paused&&snapshot){$("thinking").textContent=snapshot.txt;$("recLabel").textContent="Verdict";$("recommend").textContent=snapshot.verdict;$("position").textContent=snapshot.p;$("startingStrength").textContent=snapshot.startingStrength?(snapshot.handStrength?snapshot.handStrength.percent.toFixed(1)+"%":"—"):"—";$("equity").textContent=snapshot.e.toFixed(0)+"%";$("needed").textContent=snapshot.c?snapshot.need.toFixed(1)+"%":"—";$("price").textContent="$"+snapshot.c;$("afterPot").textContent="$"+snapshot.finalPot;$("playersLive").textContent=snapshot.live;$("handLabel").textContent=snapshot.hand;$("analysisBox").classList.add("show");$("analysis").textContent=snapshot.analysis}
  else {let d=coachData();$("recLabel").textContent="Recommendation";$("position").textContent=d.p;$("startingStrength").textContent=d.startingStrength?(d.handStrength?d.handStrength.percent.toFixed(1)+"%":"—"):"—";$("equity").textContent=d.e.toFixed(0)+"%";$("needed").textContent=d.c?d.need.toFixed(1)+"%":"—";$("price").textContent="$"+d.c;$("afterPot").textContent="$"+d.finalPot;$("playersLive").textContent=d.live;$("handLabel").textContent=d.hand;$("analysisBox").classList.remove("show");let rec=strategyRecommendation(d);$("recommend").textContent=(STRATEGY_MODE==="LOOSE_TAG"?"LOOSE TAG":"TAG")+": "+rec.action.toUpperCase()+(rec.target?" TO $"+rec.target:"");$("thinking").textContent=rec.why+" ["+rec.ruleId+"]"}}
 function render(){for(let i=0;i<10;i++){let el=i===0?$("hero"):$("seat"+i);el.innerHTML=seatHTML(i);el.classList.toggle("turn",!ended&&!paused&&actor===i);el.classList.toggle("folded",players[i].folded);el.classList.toggle("winner",ended&&handWinnerIds.includes(i))}$("street").textContent=["Preflop","Flop","Turn","River","Showdown"][street];$("pot").textContent="$"+pot;$("turn").textContent=ended?"Hand complete":paused?"Paused — review your decision":`${names(actor)} to act · ${pos(actor)}`;$("board").innerHTML=board.map(c=>card(c,false)).join("")+Array(5-board.length).fill('<div class="card" style="opacity:.12">?</div>').join("");$("history").innerHTML=logs.map(x=>"<div>"+x+"</div>").join("");$("history").scrollTop=$("history").scrollHeight;$("engineState").textContent=ended?"Hand finished":paused?"Waiting for Continue":("Next: "+names(actor)+" · "+pos(actor));let ht=actor===0&&!paused&&!ended;$("actions").style.display=ht?"flex":"none";let c=callAmt(0);$("checkCall").textContent=c?`Call $${c}`:"Check";$("fold").disabled=!c;$("raise").textContent=currentBet?"Raise":"Bet";$("raise").disabled=ht&&!legalActions({players,currentBet,minRaise,raiseLocked},0).raise;$("coach").classList.toggle("show",coachVisible);$("skipEnd").style.display=(!ended&&players[0].folded)?"inline-block":"none";if(players[0].cards.length)renderCoach()}

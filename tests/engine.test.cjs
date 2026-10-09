@@ -8,6 +8,7 @@ const vm=require('node:vm');
 const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
 const evaluator=fs.readFileSync(path.join(__dirname,'..','src','hand-evaluator.mjs'),'utf8').replace(/\bexport\s+/g,'');
+const tagSource=fs.readFileSync(path.join(__dirname,'..','src','strategies','tag.mjs'),'utf8').replace(/^export \\{[^\\n]*\\};?\\s*$/gm,'').replace(/\\bexport\\s+/g,'');
 function extract(start){
  const at=html.indexOf(start);
  assert.ok(at>=0,'Missing production symbol: '+start);
@@ -26,12 +27,13 @@ function extract(start){
  }
  throw Error('Unterminated symbol: '+start);
 }
-const symbols=['function canonHand(','function inRange(','function streetName(','function tagPreflopDecision(','function awardSingle(','function activeSeatIds(','function clockwiseActive(','function pos(','function live('];
-const tables=['const openRanges=','const TAG_PF='];
+const symbols=['function canonHand(','function inRange(','function streetName(','function awardSingle(','function activeSeatIds(','function clockwiseActive(','function pos(','function live('];
+const tables=[];
 function sandbox(extra={}){
  const ctx=vm.createContext({console,...extra});
- const src=evaluator+'\nconst names=i=>i===0?"YOU":"P"+(i+1);\n'+tables.map(extract).join('\n')+'\n'+symbols.map(extract).join('\n');
+ const src=evaluator+'\n'+tagSource+'\nconst names=i=>i===0?"YOU":"P"+(i+1);\n'+tables.map(extract).join('\n')+'\n'+symbols.map(extract).join('\n');
  vm.runInContext(src,ctx);
+ vm.runInContext('globalThis.tagPreflopDecision=createTagStrategy({get players(){return players},get handActions(){return handActions},canonHand,pos,inRange,postClass:()=>({rec:"Check",why:"test"}),state:()=>({street:0,pot:3,currentBet:2,minRaise:2})}).preflop',ctx);
  return ctx;
 }
 function cards(s){return s.split(' ').map(v=>({r:v[0],s:v[1]}))}

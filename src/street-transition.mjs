@@ -5,7 +5,8 @@ export function advanceStreet({street,players,board,deck,button}){
  const next=street+1;
  const count=next===1?3:1;
  const newBoard=board.concat(Array.from({length:count},()=>deck.pop()));
- const newPlayers=players.map(p=>({...p,streetBet:0,action:""}));
+ players.forEach(p=>{p.streetBet=0;p.action=""});
+ const newPlayers=players;
  let actor=-1;
  for(let n=1;n<=newPlayers.length;n++){
   const i=(button+n)%newPlayers.length;

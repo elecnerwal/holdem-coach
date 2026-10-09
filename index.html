@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v96</title>
+<title>Hold'em Coach v97</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -23,11 +23,11 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 
 .tenTable{border-radius:42%;min-height:620px;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:auto auto 1fr auto auto;gap:8px}
 .tenTable .seat{min-width:0;font-size:12px;padding:7px}
-/* Reserve the betting-chip line so actions never resize a seat or its grid row. */
-.tenTable{grid-template-rows:repeat(2,minmax(0,1fr)) minmax(0,1.35fr) repeat(2,minmax(0,1fr))}
-.tenTable .seat{position:relative;box-sizing:border-box;min-height:0;min-width:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:5px;padding-bottom:3px}
-.tenTable .seat .actionText{position:absolute;left:4px;right:4px;bottom:22px;width:auto;height:15px;min-height:0;line-height:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2}
-.tenTable .seat .chip{position:absolute;left:50%;bottom:3px;transform:translateX(-50%);box-sizing:border-box;width:max-content;max-width:calc(100% - 8px);height:18px;line-height:12px;white-space:nowrap;padding:2px 6px;margin:0;background:#242c36;z-index:1}
+/* v97: taller fixed seat rows, normal document flow for action and bet. */
+.tenTable{grid-template-rows:minmax(112px,1fr) minmax(112px,1fr) minmax(80px,1.2fr) minmax(112px,1fr) minmax(112px,1fr)}
+.tenTable .seat{box-sizing:border-box;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.tenTable .seat .actionText{position:static;width:100%;min-height:17px;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tenTable .seat .chip{position:static;transform:none;display:inline-block;box-sizing:border-box;width:auto;max-width:100%;height:auto;line-height:normal;white-space:nowrap;padding:3px 7px;margin-top:5px}
 .tenTable .card{width:34px;height:47px;font-size:14px}
 #seat5{grid-column:2;grid-row:1}#seat6{grid-column:3;grid-row:1}#seat7{grid-column:4;grid-row:1}
 #seat4{grid-column:1;grid-row:2}#seat8{grid-column:5;grid-row:2}
@@ -47,7 +47,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
  .top{margin-bottom:8px}
  .grid{grid-template-columns:minmax(0,1fr) minmax(370px,430px);gap:12px;align-items:start}
  .tablePanel{padding:12px}
- .tenTable{min-height:0;height:clamp(380px,58vh,590px);margin-top:7px;padding:12px 20px;gap:5px}
+ .tenTable{min-height:650px;height:auto;margin-top:7px;padding:12px 20px;gap:7px}
  .tenTable .seat{padding:4px 6px;font-size:11px;align-self:stretch;min-height:0}
  .tenTable .card{width:30px;height:40px;font-size:13px}
  .tenTable .cards{margin:3px 0;gap:4px}
@@ -62,15 +62,10 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
  .chatMessages{min-height:180px;max-height:300px}
 }
 @media(min-width:1100px) and (max-height:850px){
- .tenTable{height:clamp(340px,54vh,470px)}
+ .tenTable{min-height:650px;height:auto}
  .history{height:60px}
  .tenTable .card{height:34px;width:27px}
  .tenTable .seat{font-size:10px}
- /* Keep chips visible in compact seats: fit contents rather than clipping the bottom. */
- .tenTable .seat{justify-content:flex-start;padding-top:2px;padding-bottom:1px}
- .tenTable .seat .chip{height:16px;line-height:11px;padding:1px 5px;bottom:2px}
- .tenTable .seat .actionText{bottom:19px;height:13px;line-height:13px}
-
  .box{padding:9px 12px;margin-bottom:6px}
  .chatMessages{max-height:220px;min-height:150px}
 }
@@ -96,7 +91,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v96</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v97</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><label style="font-size:12px;color:#aeb9c8;margin-right:6px">Strategy <select id="strategyMode" style="background:#202b38;color:white;border:1px solid #526073;border-radius:7px;padding:8px"><option value="TAG">TAG</option><option value="LOOSE_TAG">Loose TAG</option><option value="GTO" disabled>GTO (coming later)</option></select></label> <button id="toggleCoach">Show coach</button> <button id="openCharts" type="button">Preflop charts</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">

@@ -101,12 +101,22 @@ export function applyBettingAction(state,i,type,target=0){
    if(fullRaise)state.minRaise=increment;
    p.action=betBefore?"Raise to "+target:"Bet "+target;actionText=p.action.toLowerCase();
    if(fullRaise){state.raiseLocked=new Set();}
-   else {state.raiseLocked=new Set([...(state.raiseLocked||[]),...priorActed]);}
+   else {
+    // Several short all-ins may cumulatively constitute a full raise for a
+    // player who acted earlier. A short opening bet also reopens checking.
+    const locked=new Set();
+    if(betBefore>0)for(const seat of priorActed){
+     const last=streetActions.slice().reverse().find(a=>a.i===seat);
+     const lastFaced=last?last.toBet:players[seat].streetBet;
+     if(target-lastFaced<state.minRaise)locked.add(seat);
+    }
+    state.raiseLocked=locked;
+   }
    state._fullRaise=fullRaise;
   }
   allin=p.stack===0;if(allin)p.allin=true;
  }
- if(type==="raise"){if(state._fullRaise)state.acted=new Set([i]);else state.acted.add(i);}else state.acted.add(i);
+ if(type==="raise"){if(state._fullRaise||betBefore===0)state.acted=new Set([i]);else state.acted.add(i);}else state.acted.add(i);
  const record={i,type,amount,potBefore,betBefore,fromBet,toBet:p.streetBet,potAfter:state.pot,position,street,board:board.map(c=>({...c}))};
  if(type==="raise")record.target=target;
  streetActions.push(record);handActions.push(record);

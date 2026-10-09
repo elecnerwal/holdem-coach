@@ -38,3 +38,11 @@ test('session preserves one authoritative state through actions and showdown',as
  active.players[0].stack=NaN;
  assert.throws(()=>session.assertFinite(),/Invalid stack/);
 });
+
+test('entrypoint delegates DOM presentation to UI modules',()=>{
+ const source=script[1];
+ assert.doesNotMatch(source,/\$\("[^"]+"\)\.(?:textContent|innerHTML|style|classList|onclick|onchange)\b/);
+ for(const name of ['audio-ui.mjs','session-ui.mjs','coach-ui.mjs','chat-ui.mjs','game-controls-ui.mjs','table-ui.mjs']){
+  assert.ok(source.includes(name),'Missing UI module '+name);
+ }
+});

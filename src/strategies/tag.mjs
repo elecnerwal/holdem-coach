@@ -75,5 +75,5 @@ export function createTagStrategy(ctx){
   }
  }
 };}
- return {recommend(d){return makeStrategy().TAG.recommend(d)},grade(d,type,target,rec){return makeStrategy().TAG.grade(d,type,target,rec)}};
+ return {preflop:tagPreflopDecision,recommend(d){return makeStrategy().TAG.recommend(d)},grade(d,type,target,rec){return makeStrategy().TAG.grade(d,type,target,rec)}};
 }

@@ -76,7 +76,7 @@ test('preflop: value three-bet and fold versus open',()=>{
 test('single remaining player wins without showdown and is highlighted',()=>{
  let finished=0;
  const logs=[];
- const x=sandbox({players:[{folded:true,stack:100},{folded:false,stack:80}],pot:25,ended:false,handWinnerIds:[],log(v){logs.push(v)},finishHand(){finished++}});
+ const x=sandbox({players:[{folded:true,stack:100},{folded:false,stack:80}],pot:25,board:[],ended:false,handWinnerIds:[],log(v){logs.push(v)},finishHand(){finished++}});
  assert.equal(x.awardSingle(),true);
  assert.equal(x.players[1].stack,105);
  assert.equal(x.pot,0);assert.equal(x.ended,true);

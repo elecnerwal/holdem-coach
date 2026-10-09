@@ -78,14 +78,16 @@ test('preflop: value three-bet and fold versus open',()=>{
  x.players[0].cards=cards('7♣ 2♦');
  assert.equal(x.tagPreflopDecision({c:8}).rec,'Fold');
 });
-test('single remaining player wins without showdown and is highlighted',()=>{
- let finished=0;
- const logs=[];
- const x=sandbox({players:[{folded:true,stack:100},{folded:false,stack:80}],pot:25,board:[],ended:false,handWinnerIds:[],log(v){logs.push(v)},finishHand(){finished++}});
- assert.equal(x.awardSingle(),true);
- assert.equal(x.players[1].stack,105);
- assert.equal(x.pot,0);assert.equal(x.ended,true);
- assert.deepEqual(Array.from(x.handWinnerIds),[1]);assert.equal(finished,1);
+test('single remaining player wins without showdown and is highlighted',async()=>{
+ const {awardUncontested}=await import('../src/game-controller.mjs');
+ const state={players:[{folded:true,stack:100},{folded:false,stack:80}],pot:25,board:[],ended:false};
+ const result=awardUncontested(state);
+ assert.equal(result.winner,1);
+ assert.equal(result.amount,25);
+ assert.equal(state.players[1].stack,105);
+ assert.equal(state.pot,0);assert.equal(state.ended,true);
+ assert.match(html,/handWinnerIds=\[result\.winner\]/);
+ assert.match(html,/finishHand\(\)/);
 });
 test('street labels preserve strings rather than converting to showdown',()=>{
  const x=sandbox();

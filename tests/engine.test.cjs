@@ -191,3 +191,15 @@ test('street transition: turn and river each deal one and skip all-in seats',asy
  const river=advanceStreet({street:2,players,board:turn.board,deck,button:0});
  assert.equal(river.street,3);assert.equal(river.board.length,5);assert.equal(river.dealCount,1);
 });
+
+test('public poker engine exposes every rule subsystem',async()=>{
+ const engine=await import('../src/poker-engine.mjs');
+ for(const name of ['eval7','cmp','settleShowdown','createShuffledDeck','drawCard','nextDealer','initializeHand','advanceStreet','calculateWager','bettingRoundComplete','nextActionableSeat']){
+  assert.equal(typeof engine[name],'function',name);
+ }
+ const deck=engine.createShuffledDeck('23456789TJQKA',['♠','♥','♦','♣'],()=>0.5);
+ const {button}=engine.nextDealer([200,200,200],-1);
+ const hand=engine.initializeHand([200,200,200],button,deck);
+ assert.equal(hand.pot,3);
+ assert.equal(engine.advanceStreet({street:0,players:hand.players,board:[],deck,button}).board.length,3);
+});

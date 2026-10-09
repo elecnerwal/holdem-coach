@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v56</title>
+<title>Hold'em Coach v57</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -63,13 +63,30 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
  .box{padding:9px 12px;margin-bottom:6px}
  .chatMessages{max-height:220px;min-height:150px}
 }
+
+/* TAG preflop reference chart */
+.chartOverlay{position:fixed;inset:0;background:#000b;z-index:100;display:none;align-items:center;justify-content:center;padding:16px}
+.chartOverlay.open{display:flex}
+.chartPanel{background:#151b23;border:1px solid #374151;border-radius:14px;width:min(850px,100%);max-height:94vh;overflow:auto;padding:18px}
+.chartHeader{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+.chartHeader h2{margin:0;font-size:19px}
+.chartControls{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.chartControls label{font-size:13px;color:#b8c3d1}
+.chartControls select{display:block;background:#0d1219;color:#fff;border:1px solid #485468;border-radius:7px;padding:7px;margin-top:5px}
+.handMatrix{display:grid;grid-template-columns:repeat(13,minmax(0,1fr));gap:3px}
+.handCell{aspect-ratio:1.16;display:flex;align-items:center;justify-content:center;border-radius:4px;background:#222b37;color:#aeb9c8;font-size:clamp(9px,1.5vw,13px);font-weight:600}
+.handCell.active{background:#186eab;color:white}
+.handCell.heroHand{outline:2px solid #ffd166;outline-offset:-2px}
+.chartNote{font-size:12px;color:#b4bdc9;line-height:1.5;margin-top:12px}
+.chartLegend{display:flex;gap:15px;margin-top:10px;font-size:12px;color:#c4cfda}
+.chartSwatch{display:inline-block;width:11px;height:11px;border-radius:2px;background:#186eab;margin-right:5px}
 </style>
 </head>
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v56</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
-  <div><button id="toggleCoach">Show coach</button> <button id="newHand" style="display:none">New hand</button></div>
+  <div><strong>Hold'em Coach v57</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><button id="openCharts" type="button">Preflop charts</button> <button id="toggleCoach">Show coach</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
   <main class="tablePanel">
@@ -115,6 +132,18 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
  <div class="muted" style="font-size:11px;margin-top:7px">Connected to ChatGPT through your Cloudflare Worker. Current hand context is sent with each question.</div>
 </div>
   </aside>
+ </div>
+</div>
+<div id="chartOverlay" class="chartOverlay" role="dialog" aria-modal="true" aria-label="TAG preflop charts">
+ <div class="chartPanel">
+  <div class="chartHeader"><h2>TAG preflop charts</h2><button id="closeCharts" type="button">Close ✕</button></div>
+  <div class="chartControls">
+   <label>Situation<select id="chartSituation"><option value="rfi">Unopened pot — raise first in</option><option value="overlimp">Facing limpers — overlimp</option><option value="isoValue">Facing limpers — isolation raise</option><option value="flatRaise">Facing an open — call</option><option value="threeBet">Facing an open — 3-bet (early)</option><option value="threeBetLate">Facing an open — 3-bet (late)</option><option value="fourBet">Facing a 3-bet — 4-bet</option><option value="defend3Bet">Facing a 3-bet — continue</option></select></label>
+   <label id="chartPositionWrap">Position<select id="chartPosition"><option>UTG</option><option>UTG+1</option><option>UTG+2</option><option>MP1</option><option>MP2</option><option>LJ</option><option>HJ</option><option>CO</option><option>BTN</option><option>SB</option><option>BB</option></select></label>
+  </div>
+  <div id="chartMatrix" class="handMatrix" aria-label="169 starting hand classes"></div>
+  <div class="chartLegend"><span><i class="chartSwatch"></i>Included in range</span><span>Gold outline = your current hand</span></div>
+  <div id="chartDescription" class="chartNote"></div>
  </div>
 </div>
 <script>
@@ -244,6 +273,27 @@ const openRanges={
  HJ:["22+","A2s","A3s","A4s","A5s","A6s","A7s","A8s","A9s","ATs","AJs","AQs","AKs","K7s","K8s","K9s","KTs","KJs","KQs","Q8s","Q9s","QTs","QJs","J8s","J9s","JTs","T8s","T9s","98s","87s","76s","65s","54s","A9o","ATo","AJo","AQo","AKo","KTo","KJo","KQo","QTo","QJo","JTo"],
  CO:["22+","A2s","A3s","A4s","A5s","A6s","A7s","A8s","A9s","ATs","AJs","AQs","AKs","K6s","K7s","K8s","K9s","KTs","KJs","KQs","Q7s","Q8s","Q9s","QTs","QJs","J7s","J8s","J9s","JTs","T7s","T8s","T9s","97s","98s","87s","76s","65s","54s","A8o","A9o","ATo","AJo","AQo","AKo","KTo","KJo","KQo","QTo","QJo","JTo"]
 };
+function renderPreflopChart(){
+ const situation=$("chartSituation").value,position=$("chartPosition").value;
+ $("chartPositionWrap").style.display=situation==="rfi"?"":"none";
+ const range=situation==="rfi"?(openRanges[position]||[]):(TAG_PF[situation]||[]);
+ const order="AKQJT98765432",hero=players&&players[0]&&players[0].cards&&players[0].cards.length===2?canonHand(players[0].cards):null;
+ const cells=[];
+ for(let row=0;row<13;row++)for(let col=0;col<13;col++){
+  const hand=row===col?order[row]+order[col]:row<col?order[row]+order[col]+"s":order[col]+order[row]+"o";
+  const included=inRange(hand,range);
+  cells.push('<div class="handCell'+(included?' active':'')+(hero===hand?' heroHand':'')+'" title="'+hand+' — '+(included?'In range':'Outside range')+'">'+hand+'</div>');
+ }
+ $("chartMatrix").innerHTML=cells.join("");
+ const descriptions={rfi:"Raise-first-in baseline for the selected position. BB has no unopened-pot opening range because it already posted the big blind.",overlimp:"Hands the TAG engine currently permits overlimping at a small price, outside the small blind. This is not a general recommendation to limp every listed hand in every situation.",isoValue:"Value isolation-raise candidates against limpers. Sizing depends on the number of limpers.",flatRaise:"Potential calls against a single open at manageable sizing; position and price restrictions still apply.",threeBet:"Early-position value 3-bet baseline.",threeBetLate:"Late-position value 3-bet baseline.",fourBet:"Value 4-bet baseline.",defend3Bet:"Hands eligible to continue against a 3-bet when the price is manageable."};
+ $("chartDescription").textContent=(descriptions[situation]||"")+" These are provisional educational TAG rules, not solver-validated charts. The grid shows hand eligibility; it does not encode every situational condition.";
+}
+$("openCharts").onclick=()=>{$("chartPosition").value=pos(0) in openRanges?pos(0):"BTN";renderPreflopChart();$("chartOverlay").classList.add("open")};
+$("closeCharts").onclick=()=>$("chartOverlay").classList.remove("open");
+$("chartOverlay").addEventListener("click",e=>{if(e.target===$("chartOverlay"))$("chartOverlay").classList.remove("open")});
+$("chartSituation").onchange=renderPreflopChart;
+$("chartPosition").onchange=renderPreflopChart;
+document.addEventListener("keydown",e=>{if(e.key==="Escape")$("chartOverlay").classList.remove("open")});
 function preClass(){
  let h=canonHand(players[0].cards),p=pos(0),c=callAmt(0),facingRaise=currentBet>2;
  let premium=inRange(h,["TT+","AQs","AKs","AQo","AKo"]);

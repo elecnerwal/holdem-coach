@@ -6,6 +6,7 @@ export function createGameSession(){
   get state(){return current},
   begin(hand){if(!hand||!Array.isArray(hand.players)||!Array.isArray(hand.handStartStacks))throw Error('Invalid hand state');current=hand;return current},
   setActor(seat){current.actor=seat;return seat},
+  rebuy(seat,amount){if(!Number.isFinite(amount)||amount<=0||!Number.isInteger(seat)||!current.players[seat])throw Error("Invalid rebuy");current.players[seat].stack=amount;return current.players[seat].stack},
   setDeck(deck){current.deck=deck;return deck},
   finish(){current.ended=true},
   clearPot(){current.pot=0},

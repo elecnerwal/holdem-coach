@@ -15,7 +15,7 @@ function pos(i){
 
 return {activeSeatIds,clockwiseActive,pos};
 }
-export function settleShowdown(players,contributions,board,eval7,cmp){
+export function settleShowdown(players,contributions,board,eval7,cmp,button=-1){
  const levels=[...new Set(contributions.filter(x=>x>0))].sort((a,b)=>a-b);
  const payouts=Array(players.length).fill(0),pots=[];let prev=0;
  for(const level of levels){
@@ -25,7 +25,9 @@ export function settleShowdown(players,contributions,board,eval7,cmp){
   let best=null,winners=[];
   for(const i of eligible){const rank=eval7(players[i].cards.concat(board));if(!best||cmp(rank,best)>0){best=rank;winners=[i]}else if(cmp(rank,best)===0)winners.push(i)}
   const share=Math.floor(amount/winners.length),remainder=amount-share*winners.length;
-  winners.forEach((i,k)=>payouts[i]+=share+(k===0?remainder:0));
+  const oddChipOrder=winners.slice().sort((a,b)=>((a-button-1+players.length)%players.length)-((b-button-1+players.length)%players.length));
+  winners.forEach(i=>payouts[i]+=share);
+  for(let k=0;k<remainder;k++)payouts[oddChipOrder[k]]++;
   pots.push({amount,winners,rank:best});
  }
  return {payouts,pots};
@@ -78,6 +80,7 @@ export function applyBettingAction(state,i,type,target=0){
  if(type==="call"&&toCall===0)throw Error("Nothing to call");
  if(type==="raise"){
   if(state.raiseLocked?.has(i))throw Error("Betting is not reopened to this player");
+  if(!players.some((q,j)=>j!==i&&!q.folded&&!q.allin&&q.stack>0))throw Error("No opponent can call a raise");
   if(!Number.isFinite(target)||!Number.isInteger(target)||target<=state.currentBet||target>maxBet)throw Error("Invalid raise target");
   if(target<state.currentBet+state.minRaise&&target!==maxBet)throw Error("Raise below minimum");
  }
@@ -121,7 +124,7 @@ export function settleUncontested(state){
 export function finishShowdown(state,eval7,cmp){
  const contributions=state.players.map((p,i)=>Math.max(0,state.handStartStacks[i]-p.stack));
  const uncalled=returnUncalledWager(state.players,contributions);
- const settlement=settleShowdown(state.players,contributions,state.board,eval7,cmp);
+ const settlement=settleShowdown(state.players,contributions,state.board,eval7,cmp,state.button??-1);
  for(let i=0;i<state.players.length;i++)state.players[i].stack+=settlement.payouts[i];
  const totalPot=state.pot;
  state.pot=0;state.street=4;state.ended=true;
@@ -139,7 +142,8 @@ export function legalActions(state,i){
  const toCall=Math.max(0,state.currentBet-p.streetBet),maxRaiseTo=p.streetBet+p.stack;
  const minRaiseTo=Math.min(maxRaiseTo,state.currentBet+state.minRaise);
  const locked=state.raiseLocked?.has(i)===true;
- return {fold:true,check:toCall===0,call:toCall>0&&p.stack>0,raise:!locked&&maxRaiseTo>state.currentBet,minRaiseTo:!locked&&maxRaiseTo>state.currentBet?minRaiseTo:null,maxRaiseTo,toCall};
+ const opponentCanCall=state.players.some((q,j)=>j!==i&&!q.folded&&!q.allin&&q.stack>0);
+ return {fold:true,check:toCall===0,call:toCall>0&&p.stack>0,raise:!locked&&opponentCanCall&&maxRaiseTo>state.currentBet,minRaiseTo:!locked&&opponentCanCall&&maxRaiseTo>state.currentBet?minRaiseTo:null,maxRaiseTo,toCall};
 }
 
 /** Conventional pot-sized raise: first call, then raise by a fraction of the pot after calling. */

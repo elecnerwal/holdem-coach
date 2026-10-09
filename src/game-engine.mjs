@@ -62,3 +62,57 @@ export function applyCall(player,wager){
  if(player.stack===0)player.allin=true;
  return wager.pay;
 }
+
+/**
+ * Authoritative betting state transition. Mutates the supplied game state,
+ * player and action histories. Presentation (sounds/logs) stays in the UI.
+ * Rejects invalid actions before changing chips or action history.
+ */
+export function applyBettingAction(state,i,type,target=0){
+ const {players,board,street,position,streetActions,handActions}=state;
+ const p=players[i];
+ if(!p||p.folded||p.allin)throw Error("Player cannot act");
+ const toCall=Math.max(0,state.currentBet-p.streetBet);
+ const maxBet=p.streetBet+p.stack;
+ if(type==="check"&&toCall>0)throw Error("Cannot check facing a bet");
+ if(type==="call"&&toCall===0)throw Error("Nothing to call");
+ if(type==="raise"){
+  if(!Number.isFinite(target)||!Number.isInteger(target)||target<=state.currentBet||target>maxBet)throw Error("Invalid raise target");
+  if(target<state.currentBet+state.minRaise&&target!==maxBet)throw Error("Raise below minimum");
+ }
+ if(!["fold","check","call","raise"].includes(type))throw Error("Unknown action");
+ const potBefore=state.pot,betBefore=state.currentBet,fromBet=p.streetBet;
+ let amount=0,actionText="",allin=false;
+ if(type==="fold"){p.folded=true;p.action="Fold";actionText="folds";}
+ else if(type==="check"){p.action="Check";actionText="checks";}
+ else {
+  const wager=calculateWager({stack:p.stack,streetBet:p.streetBet,currentBet:state.currentBet,minRaise:state.minRaise,pot:state.pot},type,target);
+  amount=wager.pay;
+  p.stack-=amount;p.streetBet=wager.toBet;state.pot=wager.newPot;
+  if(type==="call"){p.action="Call "+amount;actionText="calls "+amount;}
+  else {state.currentBet=wager.newCurrentBet;state.minRaise=wager.newMinRaise;p.action=betBefore?"Raise to "+target:"Bet "+target;actionText=p.action.toLowerCase();}
+  allin=p.stack===0;if(allin)p.allin=true;
+ }
+ if(type==="raise")state.acted=new Set([i]);else state.acted.add(i);
+ const record={i,type,amount,potBefore,betBefore,fromBet,toBet:p.streetBet,potAfter:state.pot,position,street,board:board.map(c=>({...c}))};
+ if(type==="raise")record.target=target;
+ streetActions.push(record);handActions.push(record);
+ return {record,actionText,allin};
+}
+/** Award an uncontested pot without exposing any player's cards. */
+export function settleUncontested(state){
+ const remaining=state.players.map((p,i)=>!p.folded?i:-1).filter(i=>i>=0);
+ if(remaining.length!==1)return null;
+ const winner=remaining[0],amount=state.pot;
+ state.players[winner].stack+=amount;state.pot=0;state.ended=true;
+ return {winner,amount};
+}
+/** Distribute showdown winnings and close the hand. */
+export function finishShowdown(state,eval7,cmp){
+ const contributions=state.players.map((p,i)=>Math.max(0,state.handStartStacks[i]-p.stack));
+ const settlement=settleShowdown(state.players,contributions,state.board,eval7,cmp);
+ for(let i=0;i<state.players.length;i++)state.players[i].stack+=settlement.payouts[i];
+ const totalPot=state.pot;
+ state.pot=0;state.street=4;state.ended=true;
+ return {...settlement,totalPot,winners:settlement.payouts.map((n,i)=>n>0?i:-1).filter(i=>i>=0)};
+}

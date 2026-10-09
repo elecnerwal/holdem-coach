@@ -323,3 +323,43 @@ test('all-in players retain their original seat positions',async()=>{
  assert.equal(seatPositions(players,0).pos(2),'BB');
  assert.equal(seatPositions(players,0).pos(3),'UTG');
 });
+
+test('controller plays a heads-up hand from blinds through showdown',async()=>{
+ const {createHand,act,roundComplete,dealNextStreet,resolveShowdown}=await import('../src/game-controller.mjs');
+ const {createShuffledDeck,eval7,cmp}=await import('../src/poker-engine.mjs');
+ const deck=createShuffledDeck('23456789TJQKA',['♠','♥','♦','♣'],()=>0.5);
+ const state=createHand([100,100],-1,deck,['Hero','TAG']);
+ assert.equal(state.pot,3);
+ assert.equal(state.actor,state.button);
+ const initial=state.players.reduce((n,p)=>n+p.stack,0)+state.pot;
+ act(state,state.actor,'call',0,'BTN/SB');
+ const other=1-state.actor;
+ act(state,other,'check',0,'BB');
+ assert.equal(roundComplete(state),true);
+ for(let street=1;street<=3;street++){
+  const next=dealNextStreet(state);
+  assert.equal(next.street,street);
+  assert.equal(state.board.length,street===1?3:street+2);
+  act(state,other,'check',0,'BB');
+  act(state,state.button,'check',0,'BTN/SB');
+  assert.equal(roundComplete(state),true);
+ }
+ const result=resolveShowdown(state,eval7,cmp);
+ assert.equal(state.ended,true);
+ assert.equal(state.street,4);
+ assert.equal(state.pot,0);
+ assert.equal(result.payouts.reduce((a,b)=>a+b,0),3);
+ assert.equal(state.players.reduce((n,p)=>n+p.stack,0),initial);
+});
+test('controller runs out board after heads-up all-in and returns winnings',async()=>{
+ const {createHand,act,needsRunout,runout,resolveShowdown}=await import('../src/game-controller.mjs');
+ const {createShuffledDeck,eval7,cmp}=await import('../src/poker-engine.mjs');
+ const state=createHand([20,20],-1,createShuffledDeck('23456789TJQKA',['♠','♥','♦','♣'],()=>0.5));
+ act(state,state.actor,'raise',20,'BTN/SB');
+ act(state,1-state.actor,'call',0,'BB');
+ assert.equal(needsRunout(state),true);
+ assert.equal(runout(state).length,3);
+ assert.equal(state.board.length,5);
+ resolveShowdown(state,eval7,cmp);
+ assert.equal(state.players.reduce((n,p)=>n+p.stack,0),40);
+});

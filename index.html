@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v110</title>
+<title>Hold'em Coach v111</title>
 <link rel="stylesheet" href="./src/table.css">
 </head>
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v110</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v111</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><label style="font-size:12px;color:#aeb9c8;margin-right:6px">Strategy <select id="strategyMode" style="background:#202b38;color:white;border:1px solid #526073;border-radius:7px;padding:8px"><option value="TAG">TAG</option><option value="LOOSE_TAG">Loose TAG</option><option value="GTO" disabled>GTO (coming later)</option></select></label> <button id="toggleCoach">Show coach</button> <button id="openCharts" type="button">Preflop charts</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -83,12 +83,14 @@ import {createCoachUI} from "./src/coach-ui.mjs";
 import {bindGameControls} from "./src/game-controls-ui.mjs";
 import {showRebuyUI} from "./src/rebuy-ui.mjs";
 import {createAudioUI} from "./src/audio-ui.mjs";
+import {createSessionUI} from "./src/session-ui.mjs";
 import {createTagStrategy,openRanges,TAG_PF} from "./src/strategies/tag.mjs";
 import {createLooseTagStrategy,LOOSE_OPEN,LOOSE_ISO,LOOSE_OVERLIMP} from "./src/strategies/loose-tag.mjs";
 (()=>{
 const $=id=>document.getElementById(id), ranks="23456789TJQKA".split(""), suits=["♠","♥","♦","♣"];
 let paused=false,coachVisible=false,logs=[],snapshot=null,handNo=0,handHistory=[],heroReviews=[],botRebuys=Array(10).fill(0),heroBusted=false,botTimer=null,lastShowdown=null,handWinnerIds=[],gptVerdictBusy=false;
 const gameSession=createGameSession();
+const sessionUI=createSessionUI($);
 const BOT_STYLES=[null,"TAG","Calling Station","Nit","LAG","Beginner","TAG","Strong Reg","Calling Station","Nit"];
 const BOT_ACTION_DELAY=850, STREET_DELAY=1150;
 let gptRecommendationBusy=false,gptRecommendationKey="",gptRecommendation=null;
@@ -321,7 +323,7 @@ function drive(){
 }
 function skipToEnd(){
  if(gameSession.state.ended||!gameSession.state.players[0].folded)return;
- clearTimeout(botTimer);botTimer=null;paused=false;coachVisible=false;$("continue").style.display="none";$("skipEnd").style.display="none";
+ clearTimeout(botTimer);botTimer=null;paused=false;coachVisible=false;sessionUI.skipToEnd();
  let guard=0;
  while(!gameSession.state.ended&&guard++<500){
   if(runoutIfNoActions())break;
@@ -354,7 +356,7 @@ function review(type,d){
  const rec=d.tagRecommendation,grade=STRATEGIES[STRATEGY_MODE].grade(d,type,d.actionTarget,rec);
  snapshot={...d,ruleId:rec.ruleId,verdict:grade.verdict,txt:grade.reason,analysis:grade.reason,severity:grade.severity,action:type};
  heroReviews.push({ruleId:rec.ruleId,verdict:grade.verdict,analysis:grade.reason,severity:grade.severity,gptComplete:true,action:type,street:d.street,e:d.e,need:d.need,potAtDecision:d.finalPot-d.c,amountAtRisk:type==="raise"?Math.max(0,d.actionTarget-d.heroStreetBetBefore):type==="call"?d.c:0,boardAtDecision:cardsText(gameSession.state.board),heroCards:cardsText(gameSession.state.players[0].cards)});
- paused=true;coachVisible=true;$("toggleCoach").textContent="Hide coach";$("continue").style.display="inline-block";render();
+ paused=true;coachVisible=true;sessionUI.review();render();
 }
 function heroAction(type,target=0){let d=coachData();d.tagRecommendation=strategyRecommendation(d);d.actionTarget=target;d.heroStreetBetBefore=gameSession.state.players[0].streetBet;commit(0,type,target);review(type,d)}
 
@@ -428,14 +430,14 @@ function finishHand(){
   handHistory.push({hand:handNo,deltas});
   const busted=gameSession.state.players.map((p,i)=>p.stack===0?i:-1).filter(i=>i>=0);
  }
- $("next").style.display="inline-block";
+ sessionUI.finishHand();
  requestFinalHandVerdict();
 }
 function showdown(){const state=controllerState();const settlement=resolveShowdown(state,eval7,cmp);gameSession.assertFinite();const payouts=settlement.payouts;const pots=settlement.pots.map(p=>({amount:p.amount,winners:p.winners.map(names),hand:handNames[p.rank[0]]}));let totalPot=settlement.totalPot,winners=payouts.map((x,i)=>x>0?i:-1).filter(i=>i>=0),lead=winners.slice().sort((a,b)=>payouts[b]-payouts[a])[0],leadHand=lead!==undefined?handNames[eval7(gameSession.state.players[lead].cards.concat(gameSession.state.board))[0]]:"";if(winners.length===1){let h=leadHand.toLowerCase(),rr=eval7(gameSession.state.players[lead].cards.concat(gameSession.state.board)),rankWord=v=>v===14?"A":v===13?"K":v===12?"Q":v===11?"J":v===10?"T":String(v),desc=h==="high card"?rankWord(rr[1])+" high":h==="pair"?"a pair of "+rankWord(rr[1])+"s with "+rankWord(rr[2])+" kicker":h==="two pair"?"two pair, "+rankWord(rr[1])+"s and "+rankWord(rr[2])+"s, "+rankWord(rr[3])+" kicker":h==="trips"?"three of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="quads"?"four of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="straight"?"a straight, "+rankWord(rr[1])+" high":h==="flush"?"a flush, "+rankWord(rr[1])+" high":"a "+h;log("Showdown: "+names(lead)+" wins $"+payouts[lead]+" with "+desc+".")}else log("Showdown: "+winners.map(i=>names(i)+" wins $"+payouts[i]).join("; ")+".");handWinnerIds=winners.slice();lastShowdown={totalPot,board:cardsText(gameSession.state.board),payouts:winners.map(i=>({player:names(i),amount:payouts[i],cards:cardsText(gameSession.state.players[i].cards),hand:handNames[eval7(gameSession.state.players[i].cards.concat(gameSession.state.board))[0]]})),sidePots:pots};gameSession.clearPot();gameSession.state.pot=0;gameSession.assertFinite();finishHand();render()}
 function start(){
  clearTimeout(botTimer);botTimer=null;
  if(chatTurns.length){chatArchive.push({hand:handNo,turns:chatTurns.slice()});chatTurns=[]}
- const cm=$("chatMessages");if(cm)cm.innerHTML='<div class="chatBot">Ask ChatGPT about your hand, your decision, or what the other players might have.</div>';
+ sessionUI.resetChat();
  handWinnerIds=[];
  let first=gameSession.state.players.length!==10;
  let oldStacks=first?Array(10).fill(200):gameSession.state.players.map(p=>p.stack);
@@ -447,13 +449,13 @@ function start(){
  }
  shuffle();
  const hand=createHand(oldStacks,gameSession.state.button,gameSession.state.deck,BOT_STYLES);
- if(!hand){alert("Game over — only one player remains.");return}
+ if(!hand){sessionUI.gameOver();return}
  gameSession.begin(hand);
  
  const setup=hand.setup;
  dealSound(2);
  lastShowdown=null;finalHandVerdict=null;finalHandReviewBusy=false;gptVerdictBusy=false;gptRecommendationBusy=false;gptRecommendation=null;gptRecommendationKey="";paused=false;coachVisible=false;snapshot=null;logs=[];heroReviews=[];handNo++;
- $("continue").style.display="none";$("next").style.display="none";$("sizes").classList.remove("show");$("toggleCoach").textContent="Show coach";
+ sessionUI.newHand();
  log(names(setup.sb)+" posts SB $"+setup.sbPay+".");log(names(setup.bb)+" posts BB $"+setup.bbPay+".");
  render();if(gameSession.state.actor!==0)scheduleDrive(BOT_ACTION_DELAY)
 }
@@ -630,9 +632,7 @@ async function getGPTVerdict(d,type){
   warning:"Grade only this decision using information available at this moment. Raw equity is versus random hands. Identify made hands and draws correctly."
  };
  gptVerdictBusy=true;
- $("recLabel").textContent="Verdict";
- $("recommend").textContent="ChatGPT is reviewing…";
- $("thinking").textContent="Analyzing the decision in context.";
+ sessionUI.setVerdict("ChatGPT is reviewing…","Analyzing the decision in context.");
  render();
  try{
   const response=await fetch(CHAT_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
@@ -643,8 +643,7 @@ async function getGPTVerdict(d,type){
   if(!response.ok||!data.answer)throw Error(data.details||data.error||"No verdict");
   let text=data.answer.trim(),vm=text.match(/VERDICT:\s*([^\n]+)/i),rm=text.match(/REASON:\s*([\s\S]*)/i),parts=text.split(/\n+/),first=(vm?vm[1]:parts.shift()).replace(/^\*+|\*+$/g,"").replace(/^Conclusion:\s*/i,"").trim(),reason=(rm?rm[1]:parts.join(" ")).replace(/^\*+|\*+$/g,"").trim();
   if(first.length>65)first=first.slice(0,65);
-  $("recommend").textContent=first.toUpperCase();
-  $("thinking").textContent=reason||text;
+  sessionUI.setVerdict(first.toUpperCase(),reason||text);
   if(snapshot){snapshot.verdict=first;snapshot.analysis=text}
   if(heroReviews.length){
    let rr=heroReviews[heroReviews.length-1],v=first.toUpperCase();
@@ -652,8 +651,7 @@ async function getGPTVerdict(d,type){
    rr.severity=/SHOULD HAVE|BAD |MISTAKE|TOO LOOSE|TOO TIGHT/.test(v)?"major":/TOO SMALL|TOO LARGE|SMALL LEAK|SLIGHT/.test(v)?"minor":/CLOSE|MARGINAL|EITHER/.test(v)?"close":/GOOD|CORRECT|WELL PLAYED|FINE|STANDARD/.test(v)?"good":"gpt";
   }
  }catch(err){
-  $("recommend").textContent="COACH UNAVAILABLE";
-  $("thinking").textContent="ChatGPT couldn't grade this decision. The decision math is still shown below.";
+  sessionUI.setVerdict("COACH UNAVAILABLE","ChatGPT couldn't grade this decision. The decision math is still shown below.");
   if(snapshot){snapshot.verdict="COACH UNAVAILABLE";snapshot.analysis="GPT grading failed."}
   if(heroReviews.length){let rr=heroReviews[heroReviews.length-1];rr.verdict="COACH UNAVAILABLE";rr.analysis="GPT grading failed.";rr.severity="ungraded";rr.gptComplete=false}
  }finally{gptVerdictBusy=false;render()}

@@ -9,6 +9,7 @@ const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
 const evaluator=fs.readFileSync(path.join(__dirname,'..','src','hand-evaluator.mjs'),'utf8').replace(/\bexport\s+/g,'');
 const tagSource=fs.readFileSync(path.join(__dirname,'..','src','strategies','tag.mjs'),'utf8').replace(/^export \{[^\n]*\};?\s*$/gm,'').replace(/\bexport\s+/g,'');
+const gameEngine=fs.readFileSync(path.join(__dirname,'..','src','game-engine.mjs'),'utf8').replace(/\bexport\s+/g,'');
 function extract(start){
  const at=html.indexOf(start);
  assert.ok(at>=0,'Missing production symbol: '+start);
@@ -27,12 +28,13 @@ function extract(start){
  }
  throw Error('Unterminated symbol: '+start);
 }
-const symbols=['function canonHand(','function inRange(','function streetName(','function awardSingle(','function activeSeatIds(','function clockwiseActive(','function pos(','function live('];
+const symbols=['function canonHand(','function inRange(','function streetName(','function awardSingle(','function live('];
 const tables=[];
 function sandbox(extra={}){
  const ctx=vm.createContext({console,...extra});
- const src=evaluator+'\n'+tagSource+'\nconst names=i=>i===0?"YOU":"P"+(i+1);\n'+tables.map(extract).join('\n')+'\n'+symbols.map(extract).join('\n');
+ const src=evaluator+'\n'+gameEngine+'\n'+tagSource+'\nconst names=i=>i===0?"YOU":"P"+(i+1);\n'+tables.map(extract).join('\n')+'\n'+symbols.map(extract).join('\n');
  vm.runInContext(src,ctx);
+ vm.runInContext('globalThis.pos=i=>seatPositions(players,button).pos(i);globalThis.activeSeatIds=()=>seatPositions(players,button).activeSeatIds();globalThis.clockwiseActive=i=>seatPositions(players,button).clockwiseActive(i)',ctx);
  vm.runInContext('globalThis.tagPreflopDecision=createTagStrategy({get players(){return players},get handActions(){return handActions},canonHand,pos,inRange,postClass:()=>({rec:"Check",why:"test"}),state:()=>({street:0,pot:3,currentBet:2,minRaise:2})}).preflop',ctx);
  return ctx;
 }
@@ -94,4 +96,13 @@ test('structural invariants: split-pot winner assignment and UI winner class',()
  assert.match(html,/handWinnerIds=winners\.slice\(\)/);
  assert.match(html,/classList\.toggle\("winner",ended&&handWinnerIds\.includes\(i\)\)/);
  assert.match(html,/\.seat\.winner\{outline:2px solid/);
+});
+
+test('side pots: short stack wins main pot, deep stack wins side pot',()=>{
+ const x=sandbox();
+ const players=[{folded:false,cards:cards('A♠ A♥')},{folded:false,cards:cards('K♠ K♥')},{folded:false,cards:cards('Q♠ Q♥')}];
+ const result=x.settleShowdown(players,[20,50,50],cards('2♣ 3♦ 7♠ 9♥ J♣'),x.eval7,x.cmp);
+ assert.deepEqual(Array.from(result.payouts),[60,60,0]);
+ assert.equal(result.pots.length,2);
+ assert.equal(result.payouts.reduce((a,b)=>a+b,0),120);
 });

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v88</title>
+<title>Hold'em Coach v89</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -85,7 +85,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v88</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v89</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><label style="font-size:12px;color:#aeb9c8;margin-right:6px">Strategy <select id="strategyMode" style="background:#202b38;color:white;border:1px solid #526073;border-radius:7px;padding:8px"><option value="TAG">TAG</option><option value="LOOSE_TAG">Loose TAG</option><option value="GTO" disabled>GTO (coming later)</option></select></label> <button id="toggleCoach">Show coach</button> <button id="openCharts" type="button">Preflop charts</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -148,7 +148,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 </div>
 <script type="module">
 import {rank5,combos,eval7,cmp,handNames,seatPositions,settleShowdown,createShuffledDeck,drawCard,nextDealer,initializeHand,advanceStreet,bettingRoundComplete,nextActionableSeat,calculateWager,applyCall,applyBettingAction,settleUncontested,finishShowdown,shouldRunOut,legalActions,potFractionRaiseTarget} from "./src/poker-engine.mjs";
-import {createHand,act as controllerAct,roundComplete as controllerRoundComplete,nextActor as controllerNextActor,dealNextStreet,needsRunout,runout as controllerRunout,resolveShowdown} from "./src/game-controller.mjs";
+import {createHand,act as controllerAct,roundComplete as controllerRoundComplete,nextActor as controllerNextActor,dealNextStreet,needsRunout,runout as controllerRunout,awardUncontested,resolveShowdown} from "./src/game-controller.mjs";
 import {decideBotAction} from "./src/bot-ai.mjs";
 import {createTagStrategy,openRanges,TAG_PF} from "./src/strategies/tag.mjs";
 import {createLooseTagStrategy,LOOSE_OPEN,LOOSE_ISO,LOOSE_OVERLIMP} from "./src/strategies/loose-tag.mjs";
@@ -158,7 +158,6 @@ let deck=[], players=[], board=[], button=-1, street=0, pot=0, currentBet=0, min
 const BOT_STYLES=[null,"TAG","Calling Station","Nit","LAG","Beginner","TAG","Strong Reg","Calling Station","Nit"];
 const BOT_ACTION_DELAY=850, STREET_DELAY=1150;
 let gptRecommendationBusy=false,gptRecommendationKey="",gptRecommendation=null;
-const STYLE={"TAG":{loose:0,aggr:.12,sticky:0},"Calling Station":{loose:2,aggr:-.12,sticky:.20},"Nit":{loose:-2,aggr:-.08,sticky:-.20},"LAG":{loose:3,aggr:.28,sticky:.05},"Beginner":{loose:1,aggr:.02,sticky:.08},"Strong Reg":{loose:0,aggr:.16,sticky:-.04}};
 const rv=r=>ranks.indexOf(r)+2, names=i=>i===0?"YOU":"P"+(i+1);
 let audioEnabled=false;
 const SFX={
@@ -445,7 +444,7 @@ function winnerMadeHand(i){
  if(r[0]===7)return "four of a kind, "+value(r[1]);
  return label.toLowerCase();
 }
-function awardSingle(){const state={players,pot,ended};const result=settleUncontested(state);if(!result)return false;handWinnerIds=[result.winner];pot=state.pot;ended=state.ended;log(`${names(result.winner)} wins ${result.amount} — everyone else folded.`);finishHand();return true}
+function awardSingle(){const state=controllerState();const result=awardUncontested(state);if(!result)return false;syncController(state);handWinnerIds=[result.winner];log(`${names(result.winner)} wins ${result.amount} — everyone else folded.`);finishHand();return true}
 function firstPost(){for(let n=1;n<=10;n++){let j=(button+n)%10;if(!players[j].folded&&!players[j].allin)return j}return -1}
 function nextStreet(){if(street===3){showdown();return}const state=controllerState();const next=dealNextStreet(state);syncController(state);dealSound(next.dealCount);log(next.label)}
 function aiDecision(i){

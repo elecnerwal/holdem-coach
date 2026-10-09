@@ -460,7 +460,7 @@ function start(){
   if(oldStacks[0]===0){heroBusted=true;showHeroRebuy();return}
  }
  shuffle();
- const hand=createHand(oldStacks,button:gameSession.state.button,deck:gameSession.state.deck,BOT_STYLES);
+ const hand=createHand(oldStacks,gameSession.state.button,gameSession.state.deck,BOT_STYLES);
  if(!hand){alert("Game over — only one player remains.");return}
  gameSession.begin(hand);
  
@@ -587,7 +587,7 @@ STRATEGIES.LOOSE_TAG=createLooseTagStrategy(strategyContext,STRATEGIES.TAG);
 function strategyRecommendation(d){return STRATEGIES[STRATEGY_MODE].recommend(d)}
 
 function recommendationKey(d){
- return [handNo,street:gameSession.state.street,actor:gameSession.state.actor,pot:gameSession.state.pot,currentBet:gameSession.state.currentBet,d.c,cardsText(gameSession.state.board).join(","),gameSession.state.handActions.length].join("|");
+ return [handNo,gameSession.state.street,gameSession.state.actor,gameSession.state.pot,gameSession.state.currentBet,d.c,cardsText(gameSession.state.board).join(","),gameSession.state.handActions.length].join("|");
 }
 async function requestGPTRecommendation(d,key){
  if(gptRecommendationBusy||gameSession.state.ended||paused||gameSession.state.actor!==0)return;

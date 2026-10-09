@@ -7,7 +7,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
-const evaluator=fs.readFileSync(path.join(__dirname,'..','src','hand-evaluator.mjs'),'utf8').replace(/\\bexport\\s+/g,'');
+const evaluator=fs.readFileSync(path.join(__dirname,'..','src','hand-evaluator.mjs'),'utf8').replace(/\bexport\s+/g,'');
 function extract(start){
  const at=html.indexOf(start);
  assert.ok(at>=0,'Missing production symbol: '+start);
@@ -30,7 +30,7 @@ const symbols=['function canonHand(','function inRange(','function streetName(',
 const tables=['const openRanges=','const TAG_PF='];
 function sandbox(extra={}){
  const ctx=vm.createContext({console,...extra});
- const src=evaluator+'\\nconst names=i=>i===0?"YOU":"P"+(i+1);\\n'+tables.map(extract).join('\\n')+'\\n'+symbols.map(extract).join('\\n');
+ const src=evaluator+'\nconst names=i=>i===0?"YOU":"P"+(i+1);\n'+tables.map(extract).join('\n')+'\n'+symbols.map(extract).join('\n');
  vm.runInContext(src,ctx);
  return ctx;
 }

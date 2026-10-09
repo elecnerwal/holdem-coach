@@ -397,3 +397,20 @@ test('browser delegates bot decisions to standalone module',()=>{
  assert.match(html,/from "\.\/src\/bot-ai\.mjs"/);
  assert.match(html,/return decideBotAction\(/);
 });
+
+test('controller conserves chips across three-way all-in with side pot',async()=>{
+ const {createHand,act,needsRunout,runout,resolveShowdown}=await import('../src/game-controller.mjs');
+ const {createShuffledDeck,eval7,cmp}=await import('../src/poker-engine.mjs');
+ const state=createHand([20,50,100],-1,createShuffledDeck('23456789TJQKA',['♠','♥','♦','♣'],()=>0.5));
+ act(state,0,'raise',20,'BTN');
+ act(state,1,'call',0,'SB');
+ act(state,2,'raise',50,'BB');
+ act(state,1,'call',0,'SB');
+ assert.equal(state.pot,120);
+ assert.equal(needsRunout(state),true);
+ runout(state);
+ const settlement=resolveShowdown(state,eval7,cmp);
+ assert.equal(settlement.payouts.reduce((a,b)=>a+b,0),120);
+ assert.equal(state.players.reduce((a,p)=>a+p.stack,0),170);
+ assert.equal(state.pot,0);
+});

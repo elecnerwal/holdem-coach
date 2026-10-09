@@ -7,6 +7,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+const evaluator=fs.readFileSync(path.join(__dirname,'..','src','hand-evaluator.mjs'),'utf8').replace(/\\bexport\\s+/g,'');
 function extract(start){
  const at=html.indexOf(start);
  assert.ok(at>=0,'Missing production symbol: '+start);
@@ -25,7 +26,7 @@ function extract(start){
  }
  throw Error('Unterminated symbol: '+start);
 }
-const symbols=['function combos(','function rank5(','function eval7(','function cmp(','function canonHand(','function inRange(','function streetName(','function tagPreflopDecision(','function awardSingle(','function activeSeatIds(','function clockwiseActive(','function pos(','function live('];
+const symbols=['function canonHand(','function inRange(','function streetName(','function tagPreflopDecision(','function awardSingle(','function activeSeatIds(','function clockwiseActive(','function pos(','function live('];
 const tables=['const openRanges=','const TAG_PF='];
 function sandbox(extra={}){
  const ctx=vm.createContext({console,...extra});

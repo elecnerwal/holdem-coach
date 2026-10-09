@@ -262,3 +262,16 @@ test('pot button uses conventional raise size after calling',async()=>{
  assert.equal(potFractionRaiseTarget({...state,streetBet:1},1),14);
  assert.equal(potFractionRaiseTarget({pot:10,currentBet:0,minRaise:2,streetBet:0,stack:200},1),10);
 });
+
+test('short all-in raise does not reopen a previous bettor',async()=>{
+ const {applyBettingAction,legalActions}=await import('../src/poker-engine.mjs');
+ const players=[100,13,100].map(stack=>({stack,streetBet:0,folded:false,allin:false}));
+ const state={players,board:[],street:1,pot:0,currentBet:0,minRaise:2,acted:new Set(),raiseLocked:new Set(),streetActions:[],handActions:[],position:'BTN'};
+ applyBettingAction(state,0,'raise',10);
+ applyBettingAction(state,1,'raise',13);
+ assert.equal(state.minRaise,10);
+ assert.equal(legalActions(state,0).raise,false);
+ assert.throws(()=>applyBettingAction(state,0,'raise',30));
+ applyBettingAction(state,2,'raise',25);
+ assert.equal(legalActions(state,0).raise,true);
+});

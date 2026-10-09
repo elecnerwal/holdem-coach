@@ -96,8 +96,10 @@ test('street labels preserve strings rather than converting to showdown',()=>{
 });
 test('structural invariants: split-pot winner assignment and UI winner class',()=>{
  assert.match(html,/handWinnerIds=winners\.slice\(\)/);
- assert.match(html,/classList\.toggle\("winner",ended&&handWinnerIds\.includes\(i\)\)/);
- assert.match(html,/\.seat\.winner\{outline:2px solid/);
+ const tableUI=fs.readFileSync(path.join(__dirname,"..","src","table-ui.mjs"),"utf8");
+ const tableCSS=fs.readFileSync(path.join(__dirname,"..","src","table.css"),"utf8");
+ assert.match(tableUI,/classList\.toggle\("winner",ended&&handWinnerIds\.includes\(i\)\)/);
+ assert.match(tableCSS,/\.seat\.winner\{outline:2px solid/);
 });
 
 test('side pots: short stack wins main pot, deep stack wins side pot',()=>{

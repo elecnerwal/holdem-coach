@@ -3,95 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v103</title>
-<style>
-:root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
-*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.wrap{max-width:1200px;margin:auto;padding:18px}.top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px}.muted{color:var(--muted)}
-button{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:10px 14px;font-weight:650;cursor:pointer}
-button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed}.primary{background:var(--accent);border-color:var(--accent)}
-.grid{display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:16px}@media(max-width:850px){.grid{grid-template-columns:1fr}}
-.tablePanel,.box{background:var(--panel);border:1px solid var(--border);border-radius:14px}.tablePanel{padding:16px}.box{padding:15px;margin-bottom:12px}
-.status{display:flex;justify-content:space-between}.pot{text-align:right;font-size:28px;font-weight:800}
-.table{margin-top:12px;border-radius:45%;background:var(--felt);border:8px solid #3b2b1f;min-height:420px;padding:22px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:auto 1fr auto;gap:12px}
-.seat{background:rgba(13,17,23,.92);border:1px solid var(--border);border-radius:12px;padding:9px;text-align:center;min-width:120px}.seat.turn{outline:3px solid var(--accent)}.seat.winner{outline:2px solid #3b91ff;outline-offset:1px}.seat.folded{opacity:.55}
-#seat1{grid-column:1}#seat2{grid-column:2}#seat3{grid-column:3}#hero{grid-column:2;grid-row:3}.board{grid-column:1/4;grid-row:2;display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}
-.cards{display:flex;justify-content:center;gap:5px;margin:7px 0}.card{width:45px;height:62px;border-radius:7px;background:#f6f8fa;color:#111;border:1px solid #aaa;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800}.red{color:#c62828}.back{background:#26364d;color:#8aa4c8}
-.badge,.chip{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:3px 7px;font-size:11px}.chip{margin-top:5px;background:#242c36}.actionText{font-size:12px;font-weight:700;min-height:17px}
-.controls{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}.sizes{display:none;margin-top:8px}.sizes.show{display:flex}.history{margin-top:14px;background:#0d1117;border:1px solid var(--border);border-radius:9px;padding:10px;min-height:90px;max-height:150px;overflow-y:auto;font-size:13px;line-height:1.6;scroll-behavior:smooth}
-.coach{display:none}.coach.show{display:block}.box h3{margin:0 0 10px;font-size:16px}.coachHead{display:flex;justify-content:space-between;gap:8px}.rule{border-top:1px solid var(--border);margin:12px 0}.label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}.recommend{font-weight:800;margin-top:4px}.math{display:grid;grid-template-columns:1fr 1fr;gap:12px}.num{font-size:20px;font-weight:800}.analysis{display:none}.analysis.show{display:block}.good{color:var(--good)}.bad{color:var(--bad)}
-
-.tenTable{border-radius:42%;min-height:620px;display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:auto auto 1fr auto auto;gap:8px}
-.tenTable .seat{min-width:0;font-size:12px;padding:7px}
-/* v100: allow complete action labels and full seat content with a compact center aisle. */
-.tenTable{grid-template-rows:118px 118px 12px 118px 118px}
-.tenTable .seat{box-sizing:border-box;min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:6px;padding-bottom:6px}
-.tenTable .seat .actionText{position:static;width:100%;min-height:17px;line-height:16px;white-space:normal;overflow-wrap:anywhere;overflow:visible;font-size:11px}
-.tenTable .seat .chip{position:static;transform:none;display:inline-block;box-sizing:border-box;width:auto;max-width:100%;height:auto;line-height:normal;white-space:nowrap;padding:3px 7px;margin-top:5px}
-.tenTable .card{width:34px;height:47px;font-size:14px}
-#seat5{grid-column:2;grid-row:1}#seat6{grid-column:3;grid-row:1}#seat7{grid-column:4;grid-row:1}
-#seat4{grid-column:1;grid-row:2}#seat8{grid-column:5;grid-row:2}
-#seat3{grid-column:1;grid-row:4}#seat9{grid-column:5;grid-row:4}
-#seat2{grid-column:2;grid-row:5}#seat1{grid-column:3;grid-row:5}#hero{grid-column:4;grid-row:5}
-.tenTable .board{grid-column:2/5;grid-row:2/5}
-.dealIn{grid-column:3;grid-row:3;z-index:10;align-self:center;justify-self:center;font-size:20px;padding:14px 30px;box-shadow:0 8px 28px rgba(0,0,0,.35)}
-@media(max-width:900px){.tenTable{min-height:560px}.tenTable .seat{font-size:10px}.tenTable .card{width:27px;height:38px;font-size:11px}}
-
-.chatMessages{background:#0d1117;border:1px solid var(--border);border-radius:9px;padding:10px;min-height:120px;max-height:260px;overflow:auto;font-size:13px;line-height:1.45}
-.chatUser,.chatBot{margin:7px 0;padding:8px 10px;border-radius:9px}.chatUser{background:#1f3a5f;margin-left:28px}.chatBot{background:#20262e;margin-right:20px}.chatRow{display:flex;gap:7px;margin-top:8px}
-.chatRow input{flex:1;min-width:0;background:#0d1117;color:var(--text);border:1px solid var(--border);border-radius:9px;padding:10px}
-
-/* v15: desktop-wide, viewport-conscious layout */
-@media(min-width:1100px){
- .wrap{max-width:1760px;width:calc(100% - 36px);padding:10px 0}
- .top{margin-bottom:8px}
- .grid{grid-template-columns:minmax(0,1fr) minmax(370px,430px);gap:12px;align-items:start}
- .tablePanel{padding:12px}
- .tenTable{min-height:0;height:auto;margin-top:7px;padding:10px 20px;gap:5px}
- .tenTable .seat{padding:4px 6px;font-size:11px;align-self:stretch;min-height:0}
- .tenTable .card{width:30px;height:40px;font-size:13px}
- .tenTable .cards{margin:3px 0;gap:4px}
- .tenTable .chip{margin-top:2px}
- .history{height:clamp(60px,9vh,100px);min-height:0;overflow-y:auto;margin-top:8px;padding:7px 9px}
- .controls{margin-top:7px}
- .box{padding:11px 13px;margin-bottom:8px}
- .box h3{margin-bottom:6px}
- .rule{margin:8px 0}
- .math{gap:7px}
- .num{font-size:18px}
- .chatMessages{min-height:180px;max-height:300px}
-}
-@media(min-width:1100px) and (max-height:850px){
- .tenTable{min-height:0;height:auto}
- .history{height:60px}
- .tenTable .card{height:34px;width:27px}
- .tenTable .seat{font-size:10px}
- .box{padding:9px 12px;margin-bottom:6px}
- .chatMessages{max-height:220px;min-height:150px}
-}
-
-/* TAG preflop reference chart */
-.chartOverlay{position:fixed;inset:0;background:#000b;z-index:100;display:none;align-items:center;justify-content:center;padding:16px}
-.chartOverlay.open{display:flex}
-.chartPanel{background:#151b23;border:1px solid #374151;border-radius:14px;width:min(760px,100%);max-height:94dvh;overflow:auto;padding:14px}
-.chartHeader{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
-.chartHeader h2{margin:0;font-size:19px}
-.chartControls{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
-.chartControls label{font-size:13px;color:#b8c3d1}
-.chartControls select{display:block;background:#0d1219;color:#fff;border:1px solid #485468;border-radius:7px;padding:7px;margin-top:5px}
-.handMatrix{display:grid;grid-template-columns:repeat(13,minmax(0,1fr));gap:3px}
-.handCell{height:clamp(23px,4.35dvh,44px);min-width:0;display:flex;align-items:center;justify-content:center;border-radius:4px;background:#222b37;color:#aeb9c8;font-size:clamp(9px,1.5vw,13px);font-weight:600}
-.handCell.active{background:#186eab;color:white}
-.handCell.heroHand{outline:2px solid #ffd166;outline-offset:-2px}
-.chartNote{font-size:12px;color:#b4bdc9;line-height:1.5;margin-top:12px}
-.chartLegend{display:flex;gap:15px;margin-top:10px;font-size:12px;color:#c4cfda}
-.chartSwatch{display:inline-block;width:11px;height:11px;border-radius:2px;background:#186eab;margin-right:5px}
-</style>
+<title>Hold'em Coach v104</title>
+<link rel="stylesheet" href="./src/table.css">
 </head>
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v103</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v104</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><label style="font-size:12px;color:#aeb9c8;margin-right:6px">Strategy <select id="strategyMode" style="background:#202b38;color:white;border:1px solid #526073;border-radius:7px;padding:8px"><option value="TAG">TAG</option><option value="LOOSE_TAG">Loose TAG</option><option value="GTO" disabled>GTO (coming later)</option></select></label> <button id="toggleCoach">Show coach</button> <button id="openCharts" type="button">Preflop charts</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -158,6 +76,7 @@ import {createHand,act as controllerAct,roundComplete as controllerRoundComplete
 import {decideBotAction} from "./src/bot-ai.mjs";
 import {createCoachNarration} from "./src/coach-narration.mjs";
 import {createGameSession} from "./src/game-session.mjs";
+import {createTableUI} from "./src/table-ui.mjs";
 import {createTagStrategy,openRanges,TAG_PF} from "./src/strategies/tag.mjs";
 import {createLooseTagStrategy,LOOSE_OPEN,LOOSE_ISO,LOOSE_OVERLIMP} from "./src/strategies/loose-tag.mjs";
 (()=>{
@@ -361,10 +280,10 @@ function coachData(){
  }
  return {c:ccall,need,e,p,txt,rec,quality,why,startingStrength:startingHandStrength(players[0].cards),handStrength:currentHandStrength(),finalPot:pot+ccall,hand:heroHand(),live:live().length,street:["Preflop","Flop","Turn","River"][street]};
 }
-function seatHTML(i){let p=players[i],hide=i!==0&&(street!==4||p.folded);return `<div><strong>${names(i)} · ${pos(i)}${i===button?" · ●":""}</strong></div><div class="muted">$${p.stack}${p.folded?" · FOLDED":p.allin?" · ALL-IN":""}</div><div class="cards">${hide?card(null,true)+card(null,true):p.cards.map(c=>card(c)).join("")}</div><div class="actionText">${ended&&handWinnerIds.includes(i)?"WINNER"+(street===4&&board.length>=3?" · "+handNames[eval7(p.cards.concat(board))[0]]:""):p.action||""}</div><span class="chip" style="${p.streetBet?"":"visibility:hidden"}">${p.streetBet||0} committed</span>`}
 function renderCoach(){if(ended){showHandVerdict();return}$("decisionMathBox").style.display="";if(paused&&snapshot){$("thinking").textContent=snapshot.txt;$("recLabel").textContent="Verdict";$("recommend").textContent=snapshot.verdict;$("position").textContent=snapshot.p;$("startingStrength").textContent=snapshot.startingStrength?(snapshot.handStrength?snapshot.handStrength.percent.toFixed(1)+"%":"—"):"—";$("equity").textContent=snapshot.e.toFixed(0)+"%";$("needed").textContent=snapshot.c?snapshot.need.toFixed(1)+"%":"—";$("price").textContent="$"+snapshot.c;$("afterPot").textContent="$"+snapshot.finalPot;$("playersLive").textContent=snapshot.live;$("handLabel").textContent=snapshot.hand;$("analysisBox").classList.add("show");$("analysis").textContent=snapshot.analysis}
  else {let d=coachData();$("recLabel").textContent="Recommendation";$("position").textContent=d.p;$("startingStrength").textContent=d.startingStrength?(d.handStrength?d.handStrength.percent.toFixed(1)+"%":"—"):"—";$("equity").textContent=d.e.toFixed(0)+"%";$("needed").textContent=d.c?d.need.toFixed(1)+"%":"—";$("price").textContent="$"+d.c;$("afterPot").textContent="$"+d.finalPot;$("playersLive").textContent=d.live;$("handLabel").textContent=d.hand;$("analysisBox").classList.remove("show");let rec=strategyRecommendation(d);$("recommend").textContent=(STRATEGY_MODE==="LOOSE_TAG"?"LOOSE TAG":"TAG")+": "+rec.action.toUpperCase()+(rec.target?" TO $"+rec.target:"");$("thinking").textContent=rec.why+" ["+rec.ruleId+"]"}}
-function render(){for(let i=0;i<10;i++){let el=i===0?$("hero"):$("seat"+i);el.innerHTML=seatHTML(i);el.classList.toggle("turn",!ended&&!paused&&actor===i);el.classList.toggle("folded",players[i].folded);el.classList.toggle("winner",ended&&handWinnerIds.includes(i))}$("street").textContent=["Preflop","Flop","Turn","River","Showdown"][street];$("pot").textContent="$"+pot;$("turn").textContent=ended?"Hand complete":paused?"Paused — review your decision":`${names(actor)} to act · ${pos(actor)}`;$("board").innerHTML=board.map(c=>card(c,false)).join("")+Array(5-board.length).fill('<div class="card" style="opacity:.12">?</div>').join("");$("history").innerHTML=logs.map(x=>"<div>"+x+"</div>").join("");$("history").scrollTop=$("history").scrollHeight;$("engineState").textContent=ended?"Hand finished":paused?"Waiting for Continue":("Next: "+names(actor)+" · "+pos(actor));let ht=actor===0&&!paused&&!ended;$("actions").style.display=ht?"flex":"none";let c=callAmt(0);$("checkCall").textContent=c?`Call $${c}`:"Check";$("fold").disabled=!c;$("raise").textContent=currentBet?"Raise":"Bet";$("raise").disabled=ht&&!legalActions({players,currentBet,minRaise,raiseLocked},0).raise;$("coach").classList.toggle("show",coachVisible);$("skipEnd").style.display=(!ended&&players[0].folded)?"inline-block":"none";if(players[0].cards.length)renderCoach()}
+const tableUI=createTableUI({getState:()=>({players,board,street,pot,actor,paused,ended,handWinnerIds,logs,currentBet,minRaise,raiseLocked,coachVisible,button}),$,names,pos,card,callAmt,legalActions,renderCoach,handNames,eval7});
+function render(){tableUI.render()}
 function log(x){logs.push(x)}
 function controllerState(){return gameSession.state}
 function syncController(state){players=state.players;board=state.board;street=state.street;pot=state.pot;currentBet=state.currentBet;minRaise=state.minRaise;actor=state.actor;acted=state.acted;raiseLocked=state.raiseLocked;streetActions=state.streetActions;handActions=state.handActions;handStartStacks=state.handStartStacks;ended=state.ended}

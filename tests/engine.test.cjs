@@ -302,3 +302,14 @@ test('split-pot odd chip goes to first winner left of button',async()=>{
  const result=settleShowdown(players,[5,5,5],cards('Q♣ J♦ T♠ 4♣ 6♦'),eval7,cmp,0);
  assert.deepEqual(Array.from(result.payouts),[7,8,0]);
 });
+
+test('cumulative short all-ins can reopen action',async()=>{
+ const {applyBettingAction,legalActions}=await import('../src/poker-engine.mjs');
+ const players=[100,13,18,100].map(stack=>({stack,streetBet:0,folded:false,allin:false}));
+ const state={players,board:[],street:1,pot:0,currentBet:0,minRaise:2,acted:new Set(),raiseLocked:new Set(),streetActions:[],handActions:[],position:'BTN'};
+ applyBettingAction(state,0,'raise',10);
+ applyBettingAction(state,1,'raise',13);
+ assert.equal(legalActions(state,0).raise,false);
+ applyBettingAction(state,2,'raise',18);
+ assert.equal(legalActions(state,0).raise,false);
+});

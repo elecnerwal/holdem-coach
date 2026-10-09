@@ -30,3 +30,26 @@ export function settleShowdown(players,contributions,board,eval7,cmp){
  }
  return {payouts,pots};
 }
+
+/** Compute a wager without mutating state. Caller applies the returned patch. */
+export function calculateWager({stack,streetBet,currentBet,minRaise,pot},type,target=0){
+ const toCall=Math.max(0,currentBet-streetBet);
+ if(type==="fold"||type==="check")return {type,pay:0,toBet:streetBet,newPot:pot,newCurrentBet:currentBet,newMinRaise:minRaise,allin:stack===0};
+ if(type==="call"){
+  const pay=Math.min(toCall,stack);
+  return {type,pay,toBet:streetBet+pay,newPot:pot+pay,newCurrentBet:currentBet,newMinRaise:minRaise,allin:pay===stack};
+ }
+ if(type==="raise"){
+  const toBet=Math.min(target,streetBet+stack),pay=toBet-streetBet;
+  return {type,pay,toBet,newPot:pot+pay,newCurrentBet:toBet,newMinRaise:Math.max(2,toBet-currentBet),allin:pay===stack};
+ }
+ throw Error("Unknown betting action: "+type);
+}
+export function bettingRoundComplete(players,acted,currentBet){
+ const actionable=players.map((p,i)=>!p.folded&&!p.allin?i:-1).filter(i=>i>=0);
+ return actionable.length===0||actionable.every(i=>acted.has(i)&&players[i].streetBet===currentBet);
+}
+export function nextActionableSeat(players,from){
+ for(let n=1;n<=players.length;n++){const i=(from+n)%players.length;if(!players[i].folded&&!players[i].allin)return i}
+ return -1;
+}

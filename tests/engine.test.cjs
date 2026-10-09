@@ -363,3 +363,16 @@ test('controller runs out board after heads-up all-in and returns winnings',asyn
  resolveShowdown(state,eval7,cmp);
  assert.equal(state.players.reduce((n,p)=>n+p.stack,0),40);
 });
+
+test('controller awards uncontested blinds and preserves total chips',async()=>{
+ const {createHand,act,awardUncontested}=await import('../src/game-controller.mjs');
+ const {createShuffledDeck}=await import('../src/poker-engine.mjs');
+ const state=createHand([100,100],-1,createShuffledDeck('23456789TJQKA',['♠','♥','♦','♣'],()=>0.5));
+ act(state,state.actor,'fold',0,'BTN/SB');
+ const award=awardUncontested(state);
+ assert.equal(award.winner,1-state.button);
+ assert.equal(award.amount,3);
+ assert.equal(state.ended,true);
+ assert.equal(state.players.reduce((n,p)=>n+p.stack,0),200);
+ assert.equal(state.board.length,0);
+});

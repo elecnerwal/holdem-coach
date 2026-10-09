@@ -132,8 +132,10 @@ export function finishShowdown(state,eval7,cmp){
 }
 
 /** Determine whether all remaining players are all-in (no betting possible). */
-export function shouldRunOut(players){
- return players.every(p=>p.folded||p.allin);
+export function shouldRunOut(players,currentBet=0){
+ const eligible=players.filter(p=>!p.folded&&!p.allin);
+ if(eligible.length===0)return true;
+ return eligible.length===1&&eligible[0].streetBet>=currentBet;
 }
 /** Legal action availability for an active player, including stack-limited raises. */
 export function legalActions(state,i){

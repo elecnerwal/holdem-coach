@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v106</title>
+<title>Hold'em Coach v107</title>
 <link rel="stylesheet" href="./src/table.css">
 </head>
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v106</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v107</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><label style="font-size:12px;color:#aeb9c8;margin-right:6px">Strategy <select id="strategyMode" style="background:#202b38;color:white;border:1px solid #526073;border-radius:7px;padding:8px"><option value="TAG">TAG</option><option value="LOOSE_TAG">Loose TAG</option><option value="GTO" disabled>GTO (coming later)</option></select></label> <button id="toggleCoach">Show coach</button> <button id="openCharts" type="button">Preflop charts</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -81,6 +81,7 @@ import {createPreflopCharts} from "./src/preflop-chart-ui.mjs";
 import {createChatUI} from "./src/chat-ui.mjs";
 import {createCoachUI} from "./src/coach-ui.mjs";
 import {bindGameControls} from "./src/game-controls-ui.mjs";
+import {showRebuyUI} from "./src/rebuy-ui.mjs";
 import {createTagStrategy,openRanges,TAG_PF} from "./src/strategies/tag.mjs";
 import {createLooseTagStrategy,LOOSE_OPEN,LOOSE_ISO,LOOSE_OVERLIMP} from "./src/strategies/loose-tag.mjs";
 (()=>{
@@ -470,15 +471,7 @@ function start(){
  log(names(setup.sb)+" posts SB $"+setup.sbPay+".");log(names(setup.bb)+" posts BB $"+setup.bbPay+".");
  render();if(actor!==0)scheduleDrive(BOT_ACTION_DELAY)
 }
-function showHeroRebuy(){
- gameSession.finish();ended=true;coachVisible=true;$("coach").classList.add("show");$("toggleCoach").textContent="Hide coach";
- $("recLabel").textContent="Bankroll";$("recommend").textContent="YOU'RE OUT OF CHIPS";
- $("thinking").textContent="You can buy back into the cash game for $200.";
- $("analysisBox").style.display="block";$("analysisBox").classList.add("show");
- $("analysis").innerHTML='<button id="rebuyHero" class="primary">Buy back in for $200</button> <button id="leaveHero">End session</button>';
- setTimeout(()=>{let b=$("rebuyHero");if(b)b.onclick=()=>{players[0].stack=200;heroBusted=false;start()};let l=$("leaveHero");if(l)l.onclick=()=>{$("analysis").textContent="Session ended."}},0);
- $("next").style.display="none";$("actions").style.display="none";
-}
+function showHeroRebuy(){gameSession.finish();ended=true;coachVisible=true;showRebuyUI({$,onRebuy:()=>{players[0].stack=200;heroBusted=false;start()}})}
 
 const CHAT_API="https://holdem-coach-api.lawrence-le.workers.dev/";
 let chatBusy=false,chatTurns=[],chatArchive=[];

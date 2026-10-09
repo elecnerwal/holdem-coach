@@ -26,6 +26,9 @@ test('session preserves one authoritative state through actions and showdown',as
  assert.strictEqual(session.state,active);
  session.setActor(0);
  assert.equal(active.actor,0);
+ session.rebuy(0,200);
+ assert.equal(active.players[0].stack,200);
+ assert.throws(()=>session.rebuy(0,-10),/Invalid rebuy/);
  active.players[0].stack=198;active.players[1].stack=199;
  session.clearPot();
  assert.equal(session.state.pot,0);

@@ -315,3 +315,11 @@ test('cumulative short all-ins can reopen action',async()=>{
  applyBettingAction(state,3,'raise',21);
  assert.equal(legalActions(state,0).raise,true);
 });
+
+test('all-in players retain their original seat positions',async()=>{
+ const {seatPositions}=await import('../src/poker-engine.mjs');
+ const players=Array.from({length:10},()=>({stack:200,allin:false}));
+ players[2].stack=0;players[2].allin=true;
+ assert.equal(seatPositions(players,0).pos(2),'BB');
+ assert.equal(seatPositions(players,0).pos(3),'UTG');
+});

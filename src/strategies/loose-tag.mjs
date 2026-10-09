@@ -10,14 +10,14 @@ const LOOSE_OVERLIMP=["22+","A2s+","K7s+","Q8s+","J8s+","T8s+","98s","87s","76s"
 export {LOOSE_OPEN,LOOSE_ISO,LOOSE_OVERLIMP};
 export function createLooseTagStrategy(ctx,tag){
  const {canonHand,pos,inRange}=ctx;
- const players=ctx.players,handActions=ctx.handActions;
+
  const STRATEGIES={TAG:tag};
  function makeStrategy(){const {street}=ctx.state();return {
  recommend(d){
   const base=STRATEGIES.TAG.recommend(d);
   if(street!==0)return {...base,strategy:"LOOSE_TAG",ruleId:"LT-"+base.ruleId,why:base.why+" (Loose TAG currently uses the TAG postflop baseline.)"};
-  const h=canonHand(players[0].cards),p=pos(0);
-  const prior=handActions.filter(a=>a.street===0&&a.i!==0);
+  const h=canonHand(ctx.players[0].cards),p=pos(0);
+  const prior=ctx.handActions.filter(a=>a.street===0&&a.i!==0);
   const raises=prior.filter(a=>a.type==="raise");
   const limpers=prior.filter(a=>a.type==="call"&&a.betBefore<=2);
   let action=base.action,why=base.why,ruleId=base.ruleId,target=base.target;
@@ -28,7 +28,7 @@ export function createLooseTagStrategy(ctx,tag){
   }else if(!raises.length&&!limpers.length&&LOOSE_OPEN[p]&&inRange(h,LOOSE_OPEN[p])&&action==="fold"){
    action="raise";ruleId="LT-PF-OPEN-"+p;why="Wider late-position opening range in Loose TAG.";target=Math.max(6,8);
   }
-  if(action==="raise")target=Math.min(players[0].streetBet+players[0].stack,target||8);
+  if(action==="raise")target=Math.min(ctx.players[0].streetBet+ctx.players[0].stack,target||8);
   return {action,target,why,ruleId,confidence:"provisional",strategy:"LOOSE_TAG"};
  },
  grade(d,type,target,rec){

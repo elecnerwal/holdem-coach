@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v89</title>
+<title>Hold'em Coach v90</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -612,7 +612,7 @@ function finishHand(){
  $("next").style.display="inline-block";
  requestFinalHandVerdict();
 }
-function showdown(){const state={players,board,handStartStacks,pot,street,ended,button};const settlement=resolveShowdown(state,eval7,cmp);street=state.street;ended=state.ended;pot=state.pot;const payouts=settlement.payouts;const pots=settlement.pots.map(p=>({amount:p.amount,winners:p.winners.map(names),hand:handNames[p.rank[0]]}));let totalPot=settlement.totalPot,winners=payouts.map((x,i)=>x>0?i:-1).filter(i=>i>=0),lead=winners.slice().sort((a,b)=>payouts[b]-payouts[a])[0],leadHand=lead!==undefined?handNames[eval7(players[lead].cards.concat(board))[0]]:"";if(winners.length===1){let h=leadHand.toLowerCase(),rr=eval7(players[lead].cards.concat(board)),rankWord=v=>v===14?"A":v===13?"K":v===12?"Q":v===11?"J":v===10?"T":String(v),desc=h==="high card"?rankWord(rr[1])+" high":h==="pair"?"a pair of "+rankWord(rr[1])+"s with "+rankWord(rr[2])+" kicker":h==="two pair"?"two pair, "+rankWord(rr[1])+"s and "+rankWord(rr[2])+"s, "+rankWord(rr[3])+" kicker":h==="trips"?"three of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="quads"?"four of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="straight"?"a straight, "+rankWord(rr[1])+" high":h==="flush"?"a flush, "+rankWord(rr[1])+" high":"a "+h;log("Showdown: "+names(lead)+" wins $"+payouts[lead]+" with "+desc+".")}else log("Showdown: "+winners.map(i=>names(i)+" wins $"+payouts[i]).join("; ")+".");handWinnerIds=winners.slice();lastShowdown={totalPot,board:cardsText(board),payouts:winners.map(i=>({player:names(i),amount:payouts[i],cards:cardsText(players[i].cards),hand:handNames[eval7(players[i].cards.concat(board))[0]]})),sidePots:pots};pot=0;finishHand();render()}
+function showdown(){const state=controllerState();const settlement=resolveShowdown(state,eval7,cmp);syncController(state);const payouts=settlement.payouts;const pots=settlement.pots.map(p=>({amount:p.amount,winners:p.winners.map(names),hand:handNames[p.rank[0]]}));let totalPot=settlement.totalPot,winners=payouts.map((x,i)=>x>0?i:-1).filter(i=>i>=0),lead=winners.slice().sort((a,b)=>payouts[b]-payouts[a])[0],leadHand=lead!==undefined?handNames[eval7(players[lead].cards.concat(board))[0]]:"";if(winners.length===1){let h=leadHand.toLowerCase(),rr=eval7(players[lead].cards.concat(board)),rankWord=v=>v===14?"A":v===13?"K":v===12?"Q":v===11?"J":v===10?"T":String(v),desc=h==="high card"?rankWord(rr[1])+" high":h==="pair"?"a pair of "+rankWord(rr[1])+"s with "+rankWord(rr[2])+" kicker":h==="two pair"?"two pair, "+rankWord(rr[1])+"s and "+rankWord(rr[2])+"s, "+rankWord(rr[3])+" kicker":h==="trips"?"three of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="quads"?"four of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="straight"?"a straight, "+rankWord(rr[1])+" high":h==="flush"?"a flush, "+rankWord(rr[1])+" high":"a "+h;log("Showdown: "+names(lead)+" wins $"+payouts[lead]+" with "+desc+".")}else log("Showdown: "+winners.map(i=>names(i)+" wins $"+payouts[i]).join("; ")+".");handWinnerIds=winners.slice();lastShowdown={totalPot,board:cardsText(board),payouts:winners.map(i=>({player:names(i),amount:payouts[i],cards:cardsText(players[i].cards),hand:handNames[eval7(players[i].cards.concat(board))[0]]})),sidePots:pots};pot=0;finishHand();render()}
 function start(){
  clearTimeout(botTimer);botTimer=null;
  if(chatTurns.length){chatArchive.push({hand:handNo,turns:chatTurns.slice()});chatTurns=[]}
@@ -630,14 +630,13 @@ function start(){
  const hand=createHand(oldStacks,button,deck,BOT_STYLES);
  if(!hand){alert("Game over — only one player remains.");return}
  button=hand.button;
- players=hand.players;
+ syncController(hand);
  const setup=hand.setup;
  dealSound(2);
- board=[];street=0;pot=0;currentBet=0;lastShowdown=null;finalHandVerdict=null;finalHandReviewBusy=false;gptVerdictBusy=false;gptRecommendationBusy=false;gptRecommendation=null;gptRecommendationKey="";minRaise=2;acted=new Set();raiseLocked=new Set();streetActions=[];handActions=[];paused=false;ended=false;coachVisible=false;snapshot=null;logs=[];heroReviews=[];handNo++;handStartStacks=hand.handStartStacks.slice();
+ lastShowdown=null;finalHandVerdict=null;finalHandReviewBusy=false;gptVerdictBusy=false;gptRecommendationBusy=false;gptRecommendation=null;gptRecommendationKey="";paused=false;coachVisible=false;snapshot=null;logs=[];heroReviews=[];handNo++;
  $("continue").style.display="none";$("next").style.display="none";$("sizes").classList.remove("show");$("toggleCoach").textContent="Show coach";
- pot=setup.pot;currentBet=setup.currentBet;
  log(names(setup.sb)+" posts SB $"+setup.sbPay+".");log(names(setup.bb)+" posts BB $"+setup.bbPay+".");
- actor=setup.actor;render();if(actor!==0)scheduleDrive(BOT_ACTION_DELAY)
+ render();if(actor!==0)scheduleDrive(BOT_ACTION_DELAY)
 }
 function showHeroRebuy(){
  ended=true;coachVisible=true;$("coach").classList.add("show");$("toggleCoach").textContent="Hide coach";

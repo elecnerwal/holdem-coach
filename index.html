@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v63</title>
+<title>Hold'em Coach v64</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -85,7 +85,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v63</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v64</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><label style="font-size:12px;color:#aeb9c8;margin-right:6px">Strategy <select id="strategyMode" style="background:#202b38;color:white;border:1px solid #526073;border-radius:7px;padding:8px"><option value="TAG">TAG</option><option value="LOOSE_TAG">Loose TAG</option><option value="GTO" disabled>GTO (coming later)</option></select></label> <button id="toggleCoach">Show coach</button> <button id="openCharts" type="button">Preflop charts</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -148,6 +148,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 </div>
 <script type="module">
 import {rank5,combos,eval7,cmp,handNames} from "./src/hand-evaluator.mjs";
+import {seatPositions,settleShowdown} from "./src/game-engine.mjs";
 import {createTagStrategy,openRanges,TAG_PF} from "./src/strategies/tag.mjs";
 import {createLooseTagStrategy,LOOSE_OPEN,LOOSE_ISO,LOOSE_OVERLIMP} from "./src/strategies/loose-tag.mjs";
 (()=>{
@@ -176,18 +177,9 @@ function dealSound(count=1){playSfx("deal")}
 function allInSound(){playSfx("allin")}
 function shuffle(){deck=[];for(const r of ranks)for(const s of suits)deck.push({r,s});for(let i=deck.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[deck[i],deck[j]]=[deck[j],deck[i]]}}
 function draw(){return deck.pop()}
-function activeSeatIds(){return players.map((p,i)=>p&&p.stack>0?i:-1).filter(i=>i>=0)}
-function clockwiseActive(from){let a=[];for(let n=1;n<=10;n++){let j=(from+n)%10;if(players[j]&&players[j].stack>0)a.push(j)}return a}
-function pos(i){
- let active=activeSeatIds();if(!active.includes(i))return "OUT";
- let order=[button,...clockwiseActive(button)];
- let idx=order.indexOf(i),n=active.length;
- if(n===2)return idx===0?"BTN/SB":"BB";
- if(idx===0)return "BTN";if(idx===1)return "SB";if(idx===2)return "BB";
- let pre=n-idx;
- const labels={1:"CO",2:"HJ",3:"LJ",4:"MP2",5:"MP1",6:"UTG+1",7:"UTG"};
- return labels[pre]||("UTG+"+Math.max(0,pre-1));
-}
+function activeSeatIds(){return seatPositions(players,button).activeSeatIds()}
+function clockwiseActive(from){return seatPositions(players,button).clockwiseActive(from)}
+function pos(i){return seatPositions(players,button).pos(i)}
 function card(c,back=false){if(back)return '<div class="card back">♠</div>';return `<div class="card ${"♥♦".includes(c.s)?"red":""}">${c.r}${c.s}</div>`}
 function live(){return players.map((p,i)=>!p.folded?i:-1).filter(i=>i>=0)} function actionable(){return live().filter(i=>!players[i].allin)}
 function callAmt(i){return Math.max(0,currentBet-players[i].streetBet)}
@@ -614,7 +606,7 @@ function finishHand(){
  $("next").style.display="inline-block";
  requestFinalHandVerdict();
 }
-function showdown(){street=4;ended=true;let contrib=players.map((p,i)=>Math.max(0,handStartStacks[i]-p.stack)),levels=[...new Set(contrib.filter(x=>x>0))].sort((a,b)=>a-b),prev=0,payouts=Array(10).fill(0),pots=[];for(const level of levels){let participants=contrib.map((x,i)=>x>=level?i:-1).filter(i=>i>=0),amount=(level-prev)*participants.length;prev=level;if(!amount)continue;let eligible=participants.filter(i=>!players[i].folded);if(!eligible.length)continue;let best=null,w=[];for(const i of eligible){let rr=eval7(players[i].cards.concat(board));if(!best||cmp(rr,best)>0){best=rr;w=[i]}else if(cmp(rr,best)===0)w.push(i)}let share=Math.floor(amount/w.length),rem=amount-share*w.length;w.forEach((i,k)=>{let win=share+(k===0?rem:0);players[i].stack+=win;payouts[i]+=win});pots.push({amount,winners:w.map(names),hand:handNames[best[0]]})}let totalPot=pot,winners=payouts.map((x,i)=>x>0?i:-1).filter(i=>i>=0),lead=winners.slice().sort((a,b)=>payouts[b]-payouts[a])[0],leadHand=lead!==undefined?handNames[eval7(players[lead].cards.concat(board))[0]]:"";if(winners.length===1){let h=leadHand.toLowerCase(),rr=eval7(players[lead].cards.concat(board)),rankWord=v=>v===14?"A":v===13?"K":v===12?"Q":v===11?"J":v===10?"T":String(v),desc=h==="high card"?rankWord(rr[1])+" high":h==="pair"?"a pair of "+rankWord(rr[1])+"s with "+rankWord(rr[2])+" kicker":h==="two pair"?"two pair, "+rankWord(rr[1])+"s and "+rankWord(rr[2])+"s, "+rankWord(rr[3])+" kicker":h==="trips"?"three of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="quads"?"four of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="straight"?"a straight, "+rankWord(rr[1])+" high":h==="flush"?"a flush, "+rankWord(rr[1])+" high":"a "+h;log("Showdown: "+names(lead)+" wins $"+payouts[lead]+" with "+desc+".")}else log("Showdown: "+winners.map(i=>names(i)+" wins $"+payouts[i]).join("; ")+".");handWinnerIds=winners.slice();lastShowdown={totalPot,board:cardsText(board),payouts:winners.map(i=>({player:names(i),amount:payouts[i],cards:cardsText(players[i].cards),hand:handNames[eval7(players[i].cards.concat(board))[0]]})),sidePots:pots};pot=0;finishHand();render()}
+function showdown(){street=4;ended=true;let contrib=players.map((p,i)=>Math.max(0,handStartStacks[i]-p.stack));const settlement=settleShowdown(players,contrib,board,eval7,cmp);const payouts=settlement.payouts;for(let i=0;i<players.length;i++)players[i].stack+=payouts[i];const pots=settlement.pots.map(p=>({amount:p.amount,winners:p.winners.map(names),hand:handNames[p.rank[0]]}));let totalPot=pot,winners=payouts.map((x,i)=>x>0?i:-1).filter(i=>i>=0),lead=winners.slice().sort((a,b)=>payouts[b]-payouts[a])[0],leadHand=lead!==undefined?handNames[eval7(players[lead].cards.concat(board))[0]]:"";if(winners.length===1){let h=leadHand.toLowerCase(),rr=eval7(players[lead].cards.concat(board)),rankWord=v=>v===14?"A":v===13?"K":v===12?"Q":v===11?"J":v===10?"T":String(v),desc=h==="high card"?rankWord(rr[1])+" high":h==="pair"?"a pair of "+rankWord(rr[1])+"s with "+rankWord(rr[2])+" kicker":h==="two pair"?"two pair, "+rankWord(rr[1])+"s and "+rankWord(rr[2])+"s, "+rankWord(rr[3])+" kicker":h==="trips"?"three of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="quads"?"four of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="straight"?"a straight, "+rankWord(rr[1])+" high":h==="flush"?"a flush, "+rankWord(rr[1])+" high":"a "+h;log("Showdown: "+names(lead)+" wins $"+payouts[lead]+" with "+desc+".")}else log("Showdown: "+winners.map(i=>names(i)+" wins $"+payouts[i]).join("; ")+".");handWinnerIds=winners.slice();lastShowdown={totalPot,board:cardsText(board),payouts:winners.map(i=>({player:names(i),amount:payouts[i],cards:cardsText(players[i].cards),hand:handNames[eval7(players[i].cards.concat(board))[0]]})),sidePots:pots};pot=0;finishHand();render()}
 function start(){
  clearTimeout(botTimer);botTimer=null;
  if(chatTurns.length){chatArchive.push({hand:handNo,turns:chatTurns.slice()});chatTurns=[]}

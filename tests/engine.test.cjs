@@ -203,3 +203,14 @@ test('public poker engine exposes every rule subsystem',async()=>{
  assert.equal(hand.pot,3);
  assert.equal(engine.advanceStreet({street:0,players:hand.players,board:[],deck,button}).board.length,3);
 });
+
+test('engine applies capped call to stack, bet and all-in flag',async()=>{
+ const {calculateWager,applyCall}=await import('../src/poker-engine.mjs');
+ const player={stack:7,streetBet:2,allin:false,action:''};
+ const wager=calculateWager({stack:player.stack,streetBet:player.streetBet,currentBet:20,minRaise:18,pot:40},'call');
+ assert.equal(applyCall(player,wager),7);
+ assert.equal(player.stack,0);
+ assert.equal(player.streetBet,9);
+ assert.equal(player.allin,true);
+ assert.equal(player.action,'Call 7');
+});

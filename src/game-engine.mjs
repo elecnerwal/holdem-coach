@@ -116,3 +116,16 @@ export function finishShowdown(state,eval7,cmp){
  state.pot=0;state.street=4;state.ended=true;
  return {...settlement,totalPot,winners:settlement.payouts.map((n,i)=>n>0?i:-1).filter(i=>i>=0)};
 }
+
+/** Determine whether all remaining players are all-in (no betting possible). */
+export function shouldRunOut(players){
+ return players.every(p=>p.folded||p.allin);
+}
+/** Legal action availability for an active player, including stack-limited raises. */
+export function legalActions(state,i){
+ const p=state.players[i];
+ if(!p||p.folded||p.allin)return {fold:false,check:false,call:false,raise:false,minRaiseTo:null,maxRaiseTo:null,toCall:0};
+ const toCall=Math.max(0,state.currentBet-p.streetBet),maxRaiseTo=p.streetBet+p.stack;
+ const minRaiseTo=Math.min(maxRaiseTo,state.currentBet+state.minRaise);
+ return {fold:true,check:toCall===0,call:toCall>0&&p.stack>0,raise:maxRaiseTo>state.currentBet,minRaiseTo:maxRaiseTo>state.currentBet?minRaiseTo:null,maxRaiseTo,toCall};
+}

@@ -77,11 +77,13 @@ export function applyBettingAction(state,i,type,target=0){
  if(type==="check"&&toCall>0)throw Error("Cannot check facing a bet");
  if(type==="call"&&toCall===0)throw Error("Nothing to call");
  if(type==="raise"){
+  if(state.raiseLocked?.has(i))throw Error("Betting is not reopened to this player");
   if(!Number.isFinite(target)||!Number.isInteger(target)||target<=state.currentBet||target>maxBet)throw Error("Invalid raise target");
   if(target<state.currentBet+state.minRaise&&target!==maxBet)throw Error("Raise below minimum");
  }
  if(!["fold","check","call","raise"].includes(type))throw Error("Unknown action");
  const potBefore=state.pot,betBefore=state.currentBet,fromBet=p.streetBet;
+ const priorActed=new Set(state.acted);
  let amount=0,actionText="",allin=false;
  if(type==="fold"){p.folded=true;p.action="Fold";actionText="folds";}
  else if(type==="check"){p.action="Check";actionText="checks";}
@@ -90,14 +92,22 @@ export function applyBettingAction(state,i,type,target=0){
   amount=wager.pay;
   p.stack-=amount;p.streetBet=wager.toBet;state.pot=wager.newPot;
   if(type==="call"){p.action="Call "+amount;actionText="calls "+amount;}
-  else {state.currentBet=wager.newCurrentBet;state.minRaise=wager.newMinRaise;p.action=betBefore?"Raise to "+target:"Bet "+target;actionText=p.action.toLowerCase();}
+  else {
+   const increment=target-betBefore,fullRaise=increment>=state.minRaise;
+   state.currentBet=wager.newCurrentBet;
+   if(fullRaise)state.minRaise=increment;
+   p.action=betBefore?"Raise to "+target:"Bet "+target;actionText=p.action.toLowerCase();
+   if(fullRaise){state.raiseLocked=new Set();}
+   else {state.raiseLocked=new Set([...(state.raiseLocked||[]),...priorActed]);}
+   state._fullRaise=fullRaise;
+  }
   allin=p.stack===0;if(allin)p.allin=true;
  }
- if(type==="raise")state.acted=new Set([i]);else state.acted.add(i);
+ if(type==="raise"){if(state._fullRaise)state.acted=new Set([i]);else state.acted.add(i);}else state.acted.add(i);
  const record={i,type,amount,potBefore,betBefore,fromBet,toBet:p.streetBet,potAfter:state.pot,position,street,board:board.map(c=>({...c}))};
  if(type==="raise")record.target=target;
  streetActions.push(record);handActions.push(record);
- return {record,actionText,allin};
+ return {record,actionText,allin,raiseLocked:state.raiseLocked};
 }
 /** Award an uncontested pot without exposing any player's cards. */
 export function settleUncontested(state){
@@ -110,11 +120,12 @@ export function settleUncontested(state){
 /** Distribute showdown winnings and close the hand. */
 export function finishShowdown(state,eval7,cmp){
  const contributions=state.players.map((p,i)=>Math.max(0,state.handStartStacks[i]-p.stack));
+ const uncalled=returnUncalledWager(state.players,contributions);
  const settlement=settleShowdown(state.players,contributions,state.board,eval7,cmp);
  for(let i=0;i<state.players.length;i++)state.players[i].stack+=settlement.payouts[i];
  const totalPot=state.pot;
  state.pot=0;state.street=4;state.ended=true;
- return {...settlement,totalPot,winners:settlement.payouts.map((n,i)=>n>0?i:-1).filter(i=>i>=0)};
+ return {...settlement,uncalled,totalPot,winners:settlement.payouts.map((n,i)=>n>0?i:-1).filter(i=>i>=0)};
 }
 
 /** Determine whether all remaining players are all-in (no betting possible). */
@@ -127,7 +138,8 @@ export function legalActions(state,i){
  if(!p||p.folded||p.allin)return {fold:false,check:false,call:false,raise:false,minRaiseTo:null,maxRaiseTo:null,toCall:0};
  const toCall=Math.max(0,state.currentBet-p.streetBet),maxRaiseTo=p.streetBet+p.stack;
  const minRaiseTo=Math.min(maxRaiseTo,state.currentBet+state.minRaise);
- return {fold:true,check:toCall===0,call:toCall>0&&p.stack>0,raise:maxRaiseTo>state.currentBet,minRaiseTo:maxRaiseTo>state.currentBet?minRaiseTo:null,maxRaiseTo,toCall};
+ const locked=state.raiseLocked?.has(i)===true;
+ return {fold:true,check:toCall===0,call:toCall>0&&p.stack>0,raise:!locked&&maxRaiseTo>state.currentBet,minRaiseTo:!locked&&maxRaiseTo>state.currentBet?minRaiseTo:null,maxRaiseTo,toCall};
 }
 
 /** Conventional pot-sized raise: first call, then raise by a fraction of the pot after calling. */
@@ -138,4 +150,16 @@ export function potFractionRaiseTarget({pot,currentBet,minRaise,streetBet,stack}
  const minimum=currentBet?currentBet+minRaise:Math.max(2,minRaise);
  const raiseTo=currentBet+Math.round((pot+toCall)*fraction);
  return Math.min(max,Math.max(Math.min(max,minimum),raiseTo));
+}
+
+/** Refund the unmatched portion of the highest contribution before settlement.
+ * This amount is never contested and must not enter any side pot. */
+export function returnUncalledWager(players,contributions){
+ const order=contributions.map((amount,i)=>({amount,i})).sort((a,b)=>b.amount-a.amount);
+ if(order.length<2||order[0].amount<=order[1].amount)return {seat:-1,amount:0};
+ const {i:seat,amount:highest}=order[0];
+ const amount=highest-order[1].amount;
+ contributions[seat]-=amount;
+ players[seat].stack+=amount;
+ return {seat,amount};
 }

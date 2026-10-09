@@ -275,3 +275,15 @@ test('short all-in raise does not reopen a previous bettor',async()=>{
  applyBettingAction(state,2,'raise',25);
  assert.equal(legalActions(state,0).raise,true);
 });
+
+test('showdown returns uncalled chips and conserves stacks',async()=>{
+ const {finishShowdown,eval7,cmp}=await import('../src/poker-engine.mjs');
+ const cards=t=>t.split(' ').map(v=>({r:v[0],s:v.slice(1)}));
+ const players=[{stack:0,folded:false,cards:cards('A♠ A♥')},{stack:0,folded:false,cards:cards('K♠ K♥')}];
+ const state={players,board:cards('2♣ 3♦ 7♠ 9♥ J♣'),handStartStacks:[100,40],pot:140,street:3,ended:false};
+ const result=finishShowdown(state,eval7,cmp);
+ assert.equal(result.uncalled.amount,60);
+ assert.equal(players[0].stack,140);
+ assert.equal(players[1].stack,0);
+ assert.equal(result.payouts.reduce((a,b)=>a+b,0),80);
+});

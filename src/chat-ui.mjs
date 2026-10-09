@@ -6,5 +6,9 @@ function addChatMessage(role,message){
  return el;
 }
 
- return {addChatMessage};
+ function takeQuestion(){const inp=$("chatInput"),q=inp.value.trim();if(q)inp.value="";return q}
+ function setMessage(element,text){element.textContent=text}
+ function setBusy(busy){$("chatSend").disabled=busy}
+ function scroll(){const m=$("chatMessages");m.scrollTop=m.scrollHeight}
+ return {addChatMessage,takeQuestion,setMessage,setBusy,scroll};
 }

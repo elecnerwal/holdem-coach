@@ -106,3 +106,21 @@ test('side pots: short stack wins main pot, deep stack wins side pot',()=>{
  assert.equal(result.pots.length,2);
  assert.equal(result.payouts.reduce((a,b)=>a+b,0),120);
 });
+
+test('betting math: call is capped by stack and conserves chips',()=>{
+ const x=sandbox();
+ const w=x.calculateWager({stack:7,streetBet:2,currentBet:20,minRaise:18,pot:40},'call');
+ assert.equal(w.pay,7);assert.equal(w.toBet,9);assert.equal(w.newPot,47);assert.equal(w.allin,true);
+});
+test('betting math: raise updates current bet and minimum raise',()=>{
+ const x=sandbox();
+ const w=x.calculateWager({stack:100,streetBet:2,currentBet:8,minRaise:6,pot:30},'raise',26);
+ assert.equal(w.pay,24);assert.equal(w.newPot,54);assert.equal(w.newCurrentBet,26);assert.equal(w.newMinRaise,18);
+});
+test('round completion and next actor ignore folded and all-in seats',()=>{
+ const x=sandbox();
+ const ps=[{folded:false,allin:false,streetBet:10},{folded:true,allin:false,streetBet:0},{folded:false,allin:true,streetBet:6},{folded:false,allin:false,streetBet:10}];
+ assert.equal(x.bettingRoundComplete(ps,new Set([0,3]),10),true);
+ assert.equal(x.bettingRoundComplete(ps,new Set([0]),10),false);
+ assert.equal(x.nextActionableSeat(ps,0),3);
+});

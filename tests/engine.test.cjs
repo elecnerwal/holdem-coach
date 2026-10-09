@@ -8,7 +8,7 @@ const vm=require('node:vm');
 const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
 const evaluator=fs.readFileSync(path.join(__dirname,'..','src','hand-evaluator.mjs'),'utf8').replace(/\bexport\s+/g,'');
-const tagSource=fs.readFileSync(path.join(__dirname,'..','src','strategies','tag.mjs'),'utf8').replace(/^export \\{[^\\n]*\\};?\\s*$/gm,'').replace(/\\bexport\\s+/g,'');
+const tagSource=fs.readFileSync(path.join(__dirname,'..','src','strategies','tag.mjs'),'utf8').replace(/^export \{[^\n]*\};?\s*$/gm,'').replace(/\bexport\s+/g,'');
 function extract(start){
  const at=html.indexOf(start);
  assert.ok(at>=0,'Missing production symbol: '+start);

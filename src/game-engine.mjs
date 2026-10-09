@@ -129,3 +129,11 @@ export function legalActions(state,i){
  const minRaiseTo=Math.min(maxRaiseTo,state.currentBet+state.minRaise);
  return {fold:true,check:toCall===0,call:toCall>0&&p.stack>0,raise:maxRaiseTo>state.currentBet,minRaiseTo:maxRaiseTo>state.currentBet?minRaiseTo:null,maxRaiseTo,toCall};
 }
+
+/** Raise TO a fraction of the displayed pot, subject to table limits. */
+export function potFractionRaiseTarget({pot,currentBet,minRaise,streetBet,stack},fraction){
+ if(!Number.isFinite(fraction)||fraction<=0)throw Error("Invalid pot fraction");
+ const max=streetBet+stack;
+ const minimum=currentBet?currentBet+minRaise:Math.max(2,minRaise);
+ return Math.min(max,Math.max(Math.min(max,minimum),Math.round(pot*fraction)));
+}

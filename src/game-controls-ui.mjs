@@ -1,5 +1,8 @@
 // DOM event binding for game actions and chat. Gameplay remains in the controller.
-export function bindGameControls({$,document,getState,setState,unlockAudio,start,heroAction,callAmt,potFractionRaiseTarget,skipToEnd,afterHero,render,sendChat}){
+export function bindGameControls({$,document,getState,setState,unlockAudio,start,heroAction,callAmt,potFractionRaiseTarget,skipToEnd,afterHero,render,sendChat,onStrategyChange}){
+$("chatSend").onclick=sendChat;
+$("chatInput").addEventListener("keydown",e=>{if(e.key==="Enter")sendChat()});
+$("strategyMode").onchange=()=>onStrategyChange($("strategyMode").value);
 $("toggleCoach").onclick=()=>{let {coachVisible}=getState();coachVisible=!coachVisible;setState({coachVisible});$("toggleCoach").textContent=coachVisible?"Hide coach":"Show coach";render()}
 
 $("dealIn").onclick=()=>{unlockAudio();$("dealIn").style.display="none";$("newHand").style.display="inline-block";start()};

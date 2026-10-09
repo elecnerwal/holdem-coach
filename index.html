@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v108</title>
+<title>Hold'em Coach v109</title>
 <link rel="stylesheet" href="./src/table.css">
 </head>
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v108</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v109</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><label style="font-size:12px;color:#aeb9c8;margin-right:6px">Strategy <select id="strategyMode" style="background:#202b38;color:white;border:1px solid #526073;border-radius:7px;padding:8px"><option value="TAG">TAG</option><option value="LOOSE_TAG">Loose TAG</option><option value="GTO" disabled>GTO (coming later)</option></select></label> <button id="toggleCoach">Show coach</button> <button id="openCharts" type="button">Preflop charts</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -86,7 +86,7 @@ import {createTagStrategy,openRanges,TAG_PF} from "./src/strategies/tag.mjs";
 import {createLooseTagStrategy,LOOSE_OPEN,LOOSE_ISO,LOOSE_OVERLIMP} from "./src/strategies/loose-tag.mjs";
 (()=>{
 const $=id=>document.getElementById(id), ranks="23456789TJQKA".split(""), suits=["♠","♥","♦","♣"];
-let deck=[], players=[], board=[], button=-1, street=0, pot=0, currentBet=0, minRaise=2, actor=0, acted=new Set(), raiseLocked=new Set(), paused=false, ended=false, coachVisible=false, logs=[], snapshot=null, handNo=0, handStartStacks=[], handHistory=[], heroReviews=[], botRebuys=Array(10).fill(0), heroBusted=false, streetActions=[], handActions=[], botTimer=null, lastShowdown=null, handWinnerIds=[], gptVerdictBusy=false;
+let paused=false,coachVisible=false,logs=[],snapshot=null,handNo=0,handHistory=[],heroReviews=[],botRebuys=Array(10).fill(0),heroBusted=false,botTimer=null,lastShowdown=null,handWinnerIds=[],gptVerdictBusy=false;
 const gameSession=createGameSession();
 const BOT_STYLES=[null,"TAG","Calling Station","Nit","LAG","Beginner","TAG","Strong Reg","Calling Station","Nit"];
 const BOT_ACTION_DELAY=850, STREET_DELAY=1150;
@@ -108,17 +108,17 @@ function chipSound(){playSfx("bet")}
 function foldSound(){playSfx("fold")}
 function dealSound(count=1){playSfx("deal")}
 function allInSound(){playSfx("allin")}
-function shuffle(){deck=gameSession.setDeck(createShuffledDeck(ranks,suits))}
-function draw(){return drawCard(deck)}
-function activeSeatIds(){return seatPositions(players,button).activeSeatIds()}
-function clockwiseActive(from){return seatPositions(players,button).clockwiseActive(from)}
-function pos(i){return seatPositions(players,button).pos(i)}
+function shuffle(){gameSession.state.deck=gameSession.setDeck(createShuffledDeck(ranks,suits))}
+function draw(){return drawCard(gameSession.state.deck)}
+function activeSeatIds(){return seatPositions(gameSession.state.players,gameSession.state.button).activeSeatIds()}
+function clockwiseActive(from){return seatPositions(gameSession.state.players,gameSession.state.button).clockwiseActive(from)}
+function pos(i){return seatPositions(gameSession.state.players,gameSession.state.button).pos(i)}
 const card=renderCard;
-function live(){return players.map((p,i)=>!p.folded?i:-1).filter(i=>i>=0)} function actionable(){return live().filter(i=>!players[i].allin)}
-function callAmt(i){return Math.max(0,currentBet-players[i].streetBet)}
+function live(){return gameSession.state.players.map((p,i)=>!p.folded?i:-1).filter(i=>i>=0)} function actionable(){return live().filter(i=>!gameSession.state.players[i].allin)}
+function callAmt(i){return Math.max(0,gameSession.state.currentBet-gameSession.state.players[i].streetBet)}
 function nextActor(i){return controllerNextActor(controllerState(),i)}
-function preInfo(){let h=players[0].cards,a=rv(h[0].r),b=rv(h[1].r),hi=Math.max(a,b),lo=Math.min(a,b),pair=a===b,suited=h[0].s===h[1].s,gap=hi-lo;let score=hi+(pair?9:0)+(suited?2:0)+(gap<=1?2:gap===2?1:0)+(lo>=10?2:0);return {score,pair,suited,name:pair?h[0].r+h[1].r:(hi===a?h[0].r+h[1].r:h[1].r+h[0].r)+(suited?"s":"o")}}
-function heroHand(){if(street===0)return preInfo().name;return handNames[eval7(players[0].cards.concat(board))[0]]}
+function preInfo(){let h=gameSession.state.players[0].cards,a=rv(h[0].r),b=rv(h[1].r),hi=Math.max(a,b),lo=Math.min(a,b),pair=a===b,suited=h[0].s===h[1].s,gap=hi-lo;let score=hi+(pair?9:0)+(suited?2:0)+(gap<=1?2:gap===2?1:0)+(lo>=10?2:0);return {score,pair,suited,name:pair?h[0].r+h[1].r:(hi===a?h[0].r+h[1].r:h[1].r+h[0].r)+(suited?"s":"o")}}
+function heroHand(){if(gameSession.state.street===0)return preInfo().name;return handNames[eval7(gameSession.state.players[0].cards.concat(gameSession.state.board))[0]]}
 function chenScore(cards){
  let a=rv(cards[0].r),b=rv(cards[1].r),hi=Math.max(a,b),lo=Math.min(a,b),pair=a===b,suited=cards[0].s===cards[1].s;
  const base={14:10,13:8,12:7,11:6,10:5,9:4.5,8:4,7:3.5,6:3,5:2.5,4:2,3:1.5,2:1};
@@ -144,26 +144,26 @@ function startingHandStrength(cards){
  return {hand:h,rank169:idx<0?null:idx+1,approxTopPercent:pct===null?null:Math.max(1,Math.round(pct)),method:"Approximate absolute rank among the 169 canonical preflop hands (Chen-style); 1/169 is strongest and 169/169 is weakest; independent of number of opponents."};
 }
 function currentHandStrength(){
- if(!players[0]||players[0].cards.length!==2)return null;
- if(street===0){
-  let sh=startingHandStrength(players[0].cards);
+ if(!gameSession.state.players[0]||gameSession.state.players[0].cards.length!==2)return null;
+ if(gameSession.state.street===0){
+  let sh=startingHandStrength(gameSession.state.players[0].cards);
   if(!sh||sh.rank169==null)return null;
   return {percent:100*(170-sh.rank169)/169,detail:sh.rank169+"/169 preflop rank",method:"Preflop percentile derived from the 169 canonical starting-hand ranking; 100% is strongest."};
  }
- let known=players[0].cards.concat(board),avail=[];
+ let known=gameSession.state.players[0].cards.concat(gameSession.state.board),avail=[];
  for(const r of ranks)for(const su of suits)if(!known.some(c=>c.r===r&&c.s===su))avail.push({r,s:su});
- let hero=eval7(players[0].cards.concat(board)),behind=0,ties=0,total=0;
+ let hero=eval7(gameSession.state.players[0].cards.concat(gameSession.state.board)),behind=0,ties=0,total=0;
  for(let i=0;i<avail.length-1;i++)for(let j=i+1;j<avail.length;j++){
-  total++;let cr=cmp(eval7([avail[i],avail[j]].concat(board)),hero);
+  total++;let cr=cmp(eval7([avail[i],avail[j]].concat(gameSession.state.board)),hero);
   if(cr>0)behind++;else if(cr===0)ties++;
  }
  let pct=total?100*(total-behind)/total:100;
  return {percent:pct,detail:(total-behind)+"/"+total+" possible opponent holdings do not beat Hero now",method:"Exact current-board hand strength versus every legal opponent two-card holding. Future community cards are ignored; ties count as not beating Hero."};
 }
 function estimateEquity(){ // lightweight Monte Carlo vs random live hands, not hidden bot cards
- let opponents=live().length-1;if(opponents<=0)return 100;let known=players[0].cards.concat(board), avail=[];for(const r of ranks)for(const s of suits){if(!known.some(c=>c.r===r&&c.s===s))avail.push({r,s})}
+ let opponents=live().length-1;if(opponents<=0)return 100;let known=gameSession.state.players[0].cards.concat(gameSession.state.board), avail=[];for(const r of ranks)for(const s of suits){if(!known.some(c=>c.r===r&&c.s===s))avail.push({r,s})}
  let wins=0,trials=350;
- for(let t=0;t<trials;t++){let a=avail.slice();for(let i=a.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}let idx=0, opp=[];for(let o=0;o<opponents;o++)opp.push([a[idx++],a[idx++]]);let run=board.slice();while(run.length<5)run.push(a[idx++]);let hr=eval7(players[0].cards.concat(run)), best=true,ties=1;for(const oh of opp){let cr=cmp(eval7(oh.concat(run)),hr);if(cr>0){best=false;break}if(cr===0)ties++}if(best)wins+=1/ties}
+ for(let t=0;t<trials;t++){let a=avail.slice();for(let i=a.length-1;i;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}let idx=0, opp=[];for(let o=0;o<opponents;o++)opp.push([a[idx++],a[idx++]]);let run=gameSession.state.board.slice();while(run.length<5)run.push(a[idx++]);let hr=eval7(gameSession.state.players[0].cards.concat(run)), best=true,ties=1;for(const oh of opp){let cr=cmp(eval7(oh.concat(run)),hr);if(cr>0){best=false;break}if(cr===0)ties++}if(best)wins+=1/ties}
  return wins/trials*100
 }
 
@@ -184,9 +184,9 @@ function inRange(h,list){
  return false;
 }
 
-const {renderPreflopChart}=createPreflopCharts({$,getContext:()=>({STRATEGY_MODE,players,ended,street,handActions,pos}),canonHand,inRange,openRanges,TAG_PF,LOOSE_OPEN,LOOSE_ISO,LOOSE_OVERLIMP,strategyRecommendation,coachData});
+const {renderPreflopChart}=createPreflopCharts({$,getContext:()=>({STRATEGY_MODE,players:gameSession.state.players,ended:gameSession.state.ended,street:gameSession.state.street,handActions:gameSession.state.handActions,pos}),canonHand,inRange,openRanges,TAG_PF,LOOSE_OPEN,LOOSE_ISO,LOOSE_OVERLIMP,strategyRecommendation,coachData});
 function preClass(){
- let h=canonHand(players[0].cards),p=pos(0),c=callAmt(0),facingRaise=currentBet>2;
+ let h=canonHand(gameSession.state.players[0].cards),p=pos(0),c=callAmt(0),facingRaise=gameSession.state.currentBet>2;
  let premium=inRange(h,["TT+","AQs","AKs","AQo","AKo"]);
  let playable=inRange(h,openRanges[p]||[]);
  let marginal=inRange(h,["22+","A2s","A3s","A4s","A5s","A6s","A7s","A8s","A9s","ATs","AJs","AQs","AKs","K9s","KTs","KJs","KQs","Q9s","QTs","QJs","J9s","JTs","T9s","98s","87s","76s","ATo","AJo","AQo","AKo","KJo","KQo","QJo"]);
@@ -201,8 +201,8 @@ function preClass(){
  return {h,p,c,grade:"fold",rec:"Fold",why:"Against the raise, this hand is too weak for the baseline continuing range."};
 }
 function boardTexture(){
- if(board.length<3)return "";
- let rs=board.map(x=>rv(x.r)), suitsOn={};board.forEach(x=>suitsOn[x.s]=(suitsOn[x.s]||0)+1);
+ if(gameSession.state.board.length<3)return "";
+ let rs=gameSession.state.board.map(x=>rv(x.r)), suitsOn={};gameSession.state.board.forEach(x=>suitsOn[x.s]=(suitsOn[x.s]||0)+1);
  let paired=new Set(rs).size<rs.length, maxSuit=Math.max(...Object.values(suitsOn));
  let sorted=[...new Set(rs)].sort((a,b)=>a-b), connected=false;
  for(let i=1;i<sorted.length;i++)if(sorted[i]-sorted[i-1]<=2)connected=true;
@@ -210,7 +210,7 @@ function boardTexture(){
 }
 
 function actionPressure(){
- let opp=streetActions.filter(a=>a.i!==0), raises=opp.filter(a=>a.type==="raise"), calls=opp.filter(a=>a.type==="call");
+ let opp=gameSession.state.streetActions.filter(a=>a.i!==0), raises=opp.filter(a=>a.type==="raise"), calls=opp.filter(a=>a.type==="call");
  let lastRaise=raises[raises.length-1], frac=lastRaise&&lastRaise.potBefore?lastRaise.amount/lastRaise.potBefore:0;
  let score=0;
  if(raises.length)score+=2;if(frac>=.5)score++;if(frac>=.9)score++;
@@ -219,11 +219,11 @@ function actionPressure(){
  return {score,raises:raises.length,calls:calls.length,frac};
 }
 function heroBoardRelation(){
- let r=eval7(players[0].cards.concat(board))[0], hole=players[0].cards.map(x=>rv(x.r)), br=board.map(x=>rv(x.r));
+ let r=eval7(gameSession.state.players[0].cards.concat(gameSession.state.board))[0], hole=gameSession.state.players[0].cards.map(x=>rv(x.r)), br=gameSession.state.board.map(x=>rv(x.r));
  let top=Math.max(...br), overpair=hole[0]===hole[1]&&hole[0]>top;
  let pocket=hole[0]===hole[1], boardOver=br.filter(x=>x>Math.max(...hole)).length;
- let flushSuit=null,sc={};board.forEach(x=>sc[x.s]=(sc[x.s]||0)+1);for(const s in sc)if(sc[s]>=3)flushSuit=s;
- let hasFlushBlocker=flushSuit?players[0].cards.some(x=>x.s===flushSuit):false;
+ let flushSuit=null,sc={};gameSession.state.board.forEach(x=>sc[x.s]=(sc[x.s]||0)+1);for(const s in sc)if(sc[s]>=3)flushSuit=s;
+ let hasFlushBlocker=flushSuit?gameSession.state.players[0].cards.some(x=>x.s===flushSuit):false;
  return {rank:r,overpair,pocket,boardOver,flushSuit,hasFlushBlocker};
 }
 function postClass(d){
@@ -245,35 +245,35 @@ function postClass(d){
  return {rec:"Check often",quality:"weak",confidence:"medium",why:"With little showdown value, checking is the default unless the board strongly favors your range."};
 }
 
-const {coachVoicePost,coachVoicePre,actionAnalysis}=createCoachNarration({heroBoardRelation,actionPressure,heroHand,getStreet:()=>street});
+const {coachVoicePost,coachVoicePre,actionAnalysis}=createCoachNarration({heroBoardRelation,actionPressure,heroHand,getStreet:()=>gameSession.state.street});
 function coachData(){
- let ccall=callAmt(0),need=ccall?100*ccall/(pot+ccall):0,e=estimateEquity(),p=pos(0),txt="",rec="",quality="",why="";
- if(street===0){
+ let ccall=callAmt(0),need=ccall?100*ccall/(gameSession.state.pot+ccall):0,e=estimateEquity(),p=pos(0),txt="",rec="",quality="",why="";
+ if(gameSession.state.street===0){
   let pc=preClass();quality=pc.grade;rec=pc.rec;why=pc.why;txt=coachVoicePre(pc);
  } else {
   let base={c:ccall,need,e},pc=postClass(base);quality=pc.quality;rec=pc.rec;why=pc.why;txt=coachVoicePost(base,pc);
  }
- return {c:ccall,need,e,p,txt,rec,quality,why,startingStrength:startingHandStrength(players[0].cards),handStrength:currentHandStrength(),finalPot:pot+ccall,hand:heroHand(),live:live().length,street:["Preflop","Flop","Turn","River"][street]};
+ return {c:ccall,need,e,p,txt,rec,quality,why,startingStrength:startingHandStrength(gameSession.state.players[0].cards),handStrength:currentHandStrength(),finalPot:gameSession.state.pot+ccall,hand:heroHand(),live:live().length,street:["Preflop","Flop","Turn","River"][gameSession.state.street]};
 }
-const coachUI=createCoachUI({$,getState:()=>({ended,paused,snapshot,STRATEGY_MODE,finalHandVerdict}),coachData,strategyRecommendation,setCoachVisible:value=>{coachVisible=value}});
+const coachUI=createCoachUI({$,getState:()=>({ended:gameSession.state.ended,paused,snapshot,STRATEGY_MODE,finalHandVerdict}),coachData,strategyRecommendation,setCoachVisible:value=>{coachVisible=value}});
 function renderCoach(){coachUI.renderCoach()}
-const tableUI=createTableUI({getState:()=>({players,board,street,pot,actor,paused,ended,handWinnerIds,logs,currentBet,minRaise,raiseLocked,coachVisible,button}),$,names,pos,card,callAmt,legalActions,renderCoach,handNames,eval7});
+const tableUI=createTableUI({getState:()=>({players:gameSession.state.players,board:gameSession.state.board,street:gameSession.state.street,pot:gameSession.state.pot,actor:gameSession.state.actor,paused,ended:gameSession.state.ended,handWinnerIds,logs,currentBet:gameSession.state.currentBet,minRaise:gameSession.state.minRaise,raiseLocked:gameSession.state.raiseLocked,coachVisible,button:gameSession.state.button}),$,names,pos,card,callAmt,legalActions,renderCoach,handNames,eval7});
 function render(){tableUI.render()}
 function log(x){logs.push(x)}
 function controllerState(){return gameSession.state}
-function syncController(state){players=state.players;board=state.board;street=state.street;pot=state.pot;currentBet=state.currentBet;minRaise=state.minRaise;actor=state.actor;acted=state.acted;raiseLocked=state.raiseLocked;streetActions=state.streetActions;handActions=state.handActions;handStartStacks=state.handStartStacks;ended=state.ended}
+
 function commit(i,type,target=0){
  const state=controllerState();
  const result=controllerAct(state,i,type,target,pos(i));
- syncController(state);
+ 
  if(result.type==="fold")foldSound();
  else if(result.type==="call"||result.type==="raise"){if(result.allin)allInSound();else chipSound()}
  log(names(i)+" "+result.actionText+".");
 }
 function complete(){return controllerRoundComplete(controllerState())}
 function winnerMadeHand(i){
- if(board.length<3||!players[i].cards||players[i].cards.length!==2)return "";
- const r=eval7(players[i].cards.concat(board));
+ if(gameSession.state.board.length<3||!gameSession.state.players[i].cards||gameSession.state.players[i].cards.length!==2)return "";
+ const r=eval7(gameSession.state.players[i].cards.concat(gameSession.state.board));
  const label=handNames[r[0]];
  const value=v=>({14:"aces",13:"kings",12:"queens",11:"jacks",10:"tens",9:"nines",8:"eights",7:"sevens",6:"sixes",5:"fives",4:"fours",3:"threes",2:"twos"}[v]||String(v));
  if(r[0]===1)return "a pair of "+value(r[1]);
@@ -284,22 +284,22 @@ function winnerMadeHand(i){
  if(r[0]===7)return "four of a kind, "+value(r[1]);
  return label.toLowerCase();
 }
-function awardSingle(){const state=controllerState();const result=awardUncontested(state);if(!result)return false;syncController(state);handWinnerIds=[result.winner];log(`${names(result.winner)} wins ${result.amount} — everyone else folded.`);finishHand();return true}
-function firstPost(){for(let n=1;n<=10;n++){let j=(button+n)%10;if(!players[j].folded&&!players[j].allin)return j}return -1}
-function nextStreet(){if(street===3){showdown();return}const state=controllerState();const next=dealNextStreet(state);syncController(state);dealSound(next.dealCount);log(next.label)}
+function awardSingle(){const state=controllerState();const result=awardUncontested(state);if(!result)return false;handWinnerIds=[result.winner];log(`${names(result.winner)} wins ${result.amount} — everyone else folded.`);finishHand();return true}
+function firstPost(){for(let n=1;n<=10;n++){let j=(gameSession.state.button+n)%10;if(!gameSession.state.players[j].folded&&!gameSession.state.players[j].allin)return j}return -1}
+function nextStreet(){if(gameSession.state.street===3){showdown();return}const state=controllerState();const next=dealNextStreet(state);dealSound(next.dealCount);log(next.label)}
 function aiDecision(i){
- const p=players[i];
+ const p=gameSession.state.players[i];
  return decideBotAction({
-  cards:p.cards,board,street,pot,currentBet,minRaise,
+  cards:p.cards,board:gameSession.state.board,street:gameSession.state.street,pot:gameSession.state.pot,currentBet:gameSession.state.currentBet,minRaise:gameSession.state.minRaise,
   streetBet:p.streetBet,stack:p.stack,opponentCount:live().length,styleName:BOT_STYLES[i]
  });
 }
 function runoutIfNoActions(){
  const state=controllerState();
- if(ended)return true;
+ if(gameSession.state.ended)return true;
  if(!needsRunout(state))return false;
  const dealt=controllerRunout(state);
- syncController(state);
+ 
  for(const next of dealt){dealSound(next.dealCount);log(next.label)}
  showdown();
  return true;
@@ -310,41 +310,41 @@ function scheduleDrive(delay=BOT_ACTION_DELAY){
 }
 function drive(){
  clearTimeout(botTimer);botTimer=null;
- if(ended||paused||actor===0){render();return}
+ if(gameSession.state.ended||paused||gameSession.state.actor===0){render();return}
  if(runoutIfNoActions()){render();return}
- if(actor<0){
+ if(gameSession.state.actor<0){
   if(complete()){
    nextStreet();
    render();
-   if(!ended&&actor!==0)scheduleDrive(STREET_DELAY);
+   if(!gameSession.state.ended&&gameSession.state.actor!==0)scheduleDrive(STREET_DELAY);
   }
   return;
  }
- let [t,a]=aiDecision(actor);
- commit(actor,t,a);
+ let [t,a]=aiDecision(gameSession.state.actor);
+ commit(gameSession.state.actor,t,a);
  if(awardSingle()){render();return}
  if(complete()){
   nextStreet();
   render();
-  if(!ended&&actor!==0)scheduleDrive(STREET_DELAY);
+  if(!gameSession.state.ended&&gameSession.state.actor!==0)scheduleDrive(STREET_DELAY);
   return;
  }
- actor=gameSession.setActor(nextActor(actor));
+ gameSession.state.actor=gameSession.setActor(nextActor(gameSession.state.actor));
  render();
- if(!ended&&!paused&&actor!==0)scheduleDrive(BOT_ACTION_DELAY);
+ if(!gameSession.state.ended&&!paused&&gameSession.state.actor!==0)scheduleDrive(BOT_ACTION_DELAY);
 }
 function skipToEnd(){
- if(ended||!players[0].folded)return;
+ if(gameSession.state.ended||!gameSession.state.players[0].folded)return;
  clearTimeout(botTimer);botTimer=null;paused=false;coachVisible=false;$("continue").style.display="none";$("skipEnd").style.display="none";
  let guard=0;
- while(!ended&&guard++<500){
+ while(!gameSession.state.ended&&guard++<500){
   if(runoutIfNoActions())break;
-  if(actor===0){actor=gameSession.setActor(nextActor(0));continue}
-  if(actor<0){if(complete()){nextStreet();continue}break}
-  let [t,a]=aiDecision(actor);commit(actor,t,a);
+  if(gameSession.state.actor===0){gameSession.state.actor=gameSession.setActor(nextActor(0));continue}
+  if(gameSession.state.actor<0){if(complete()){nextStreet();continue}break}
+  let [t,a]=aiDecision(gameSession.state.actor);commit(gameSession.state.actor,t,a);
   if(awardSingle())break;
   if(complete()){nextStreet();continue}
-  actor=gameSession.setActor(nextActor(actor));
+  gameSession.state.actor=gameSession.setActor(nextActor(gameSession.state.actor));
  }
  render();
 }
@@ -354,23 +354,23 @@ function afterHero(){
  if(runoutIfNoActions()){render();return}
  if(complete()){
    nextStreet();
-   if(!ended){
+   if(!gameSession.state.ended){
      if(runoutIfNoActions()){render();return}
      scheduleDrive(BOT_ACTION_DELAY);
    } else render();
  } else {
-   actor=gameSession.setActor(nextActor(0));
-   if(actor<0 && complete())nextStreet();
+   gameSession.state.actor=gameSession.setActor(nextActor(0));
+   if(gameSession.state.actor<0 && complete())nextStreet();
    scheduleDrive(BOT_ACTION_DELAY);
  }
 }
 function review(type,d){
  const rec=d.tagRecommendation,grade=STRATEGIES[STRATEGY_MODE].grade(d,type,d.actionTarget,rec);
  snapshot={...d,ruleId:rec.ruleId,verdict:grade.verdict,txt:grade.reason,analysis:grade.reason,severity:grade.severity,action:type};
- heroReviews.push({ruleId:rec.ruleId,verdict:grade.verdict,analysis:grade.reason,severity:grade.severity,gptComplete:true,action:type,street:d.street,e:d.e,need:d.need,potAtDecision:d.finalPot-d.c,amountAtRisk:type==="raise"?Math.max(0,d.actionTarget-d.heroStreetBetBefore):type==="call"?d.c:0,boardAtDecision:cardsText(board),heroCards:cardsText(players[0].cards)});
+ heroReviews.push({ruleId:rec.ruleId,verdict:grade.verdict,analysis:grade.reason,severity:grade.severity,gptComplete:true,action:type,street:d.street,e:d.e,need:d.need,potAtDecision:d.finalPot-d.c,amountAtRisk:type==="raise"?Math.max(0,d.actionTarget-d.heroStreetBetBefore):type==="call"?d.c:0,boardAtDecision:cardsText(gameSession.state.board),heroCards:cardsText(gameSession.state.players[0].cards)});
  paused=true;coachVisible=true;$("toggleCoach").textContent="Hide coach";$("continue").style.display="inline-block";render();
 }
-function heroAction(type,target=0){let d=coachData();d.tagRecommendation=strategyRecommendation(d);d.actionTarget=target;d.heroStreetBetBefore=players[0].streetBet;commit(0,type,target);review(type,d)}
+function heroAction(type,target=0){let d=coachData();d.tagRecommendation=strategyRecommendation(d);d.actionTarget=target;d.heroStreetBetBefore=gameSession.state.players[0].streetBet;commit(0,type,target);review(type,d)}
 
 function exactEquityAt(heroCards, oppHands, b){
  let known=heroCards.concat(...oppHands,b), avail=[];
@@ -388,14 +388,14 @@ function exactEquityAt(heroCards, oppHands, b){
  return total?100*w/total:0;
 }
 function outcomeAssessment(){
- if(street!==4||!players[0].cards.length)return "";
- let heroMoney=handActions.filter(a=>a.i===0&&(a.type==="call"||a.type==="raise")&&a.amount>0);
+ if(gameSession.state.street!==4||!gameSession.state.players[0].cards.length)return "";
+ let heroMoney=gameSession.state.handActions.filter(a=>a.i===0&&(a.type==="call"||a.type==="raise")&&a.amount>0);
  if(!heroMoney.length)return "";
  let key=heroMoney.reduce((a,b)=>b.amount>a.amount?b:a);
- let oppIds=players.map((p,i)=>i!==0&&p.cards&&p.cards.length===2&&!p.folded?i:-1).filter(i=>i>=0);
+ let oppIds=gameSession.state.players.map((p,i)=>i!==0&&p.cards&&p.cards.length===2&&!p.folded?i:-1).filter(i=>i>=0);
  if(!oppIds.length)return "";
- let eq=exactEquityAt(players[0].cards,oppIds.map(i=>players[i].cards),key.board);
- let heroWon=players[0].stack>handStartStacks[0];
+ let eq=exactEquityAt(gameSession.state.players[0].cards,oppIds.map(i=>gameSession.state.players[i].cards),key.board);
+ let heroWon=gameSession.state.players[0].stack>gameSession.state.handStartStacks[0];
  let correct=heroReviews.length&&!heroReviews.some(r=>r.severity==="major");
  let label="",sentence="";
  if(eq>=65){
@@ -410,14 +410,14 @@ function outcomeAssessment(){
  return {label,sentence,eq};
 }
 function showdownReviewNote(){
- if(street!==4||!heroReviews.length)return "";
+ if(gameSession.state.street!==4||!heroReviews.length)return "";
  let o=outcomeAssessment();if(!o)return "";
  return " "+o.sentence;
 }
 let finalHandVerdict=null,finalHandReviewBusy=false;
 function showHandVerdict(){coachUI.showHandVerdict()}
 function requestFinalHandVerdict(){
- const net=players[0].stack-handStartStacks[0];
+ const net=gameSession.state.players[0].stack-gameSession.state.handStartStacks[0];
  const reviews=heroReviews.slice();
  const preFold=reviews.length===1&&reviews[0].action==="fold"&&reviews[0].street==="Preflop";
  if(preFold){
@@ -437,22 +437,22 @@ function requestFinalHandVerdict(){
  finalHandReviewBusy=false;showHandVerdict();
 }
 function finishHand(){
- if(handStartStacks.length){
-  const deltas=players.map((p,i)=>p.stack-handStartStacks[i]);
+ if(gameSession.state.handStartStacks.length){
+  const deltas=gameSession.state.players.map((p,i)=>p.stack-gameSession.state.handStartStacks[i]);
   handHistory.push({hand:handNo,deltas});
-  const busted=players.map((p,i)=>p.stack===0?i:-1).filter(i=>i>=0);
+  const busted=gameSession.state.players.map((p,i)=>p.stack===0?i:-1).filter(i=>i>=0);
  }
  $("next").style.display="inline-block";
  requestFinalHandVerdict();
 }
-function showdown(){const state=controllerState();const settlement=resolveShowdown(state,eval7,cmp);gameSession.assertFinite();syncController(state);const payouts=settlement.payouts;const pots=settlement.pots.map(p=>({amount:p.amount,winners:p.winners.map(names),hand:handNames[p.rank[0]]}));let totalPot=settlement.totalPot,winners=payouts.map((x,i)=>x>0?i:-1).filter(i=>i>=0),lead=winners.slice().sort((a,b)=>payouts[b]-payouts[a])[0],leadHand=lead!==undefined?handNames[eval7(players[lead].cards.concat(board))[0]]:"";if(winners.length===1){let h=leadHand.toLowerCase(),rr=eval7(players[lead].cards.concat(board)),rankWord=v=>v===14?"A":v===13?"K":v===12?"Q":v===11?"J":v===10?"T":String(v),desc=h==="high card"?rankWord(rr[1])+" high":h==="pair"?"a pair of "+rankWord(rr[1])+"s with "+rankWord(rr[2])+" kicker":h==="two pair"?"two pair, "+rankWord(rr[1])+"s and "+rankWord(rr[2])+"s, "+rankWord(rr[3])+" kicker":h==="trips"?"three of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="quads"?"four of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="straight"?"a straight, "+rankWord(rr[1])+" high":h==="flush"?"a flush, "+rankWord(rr[1])+" high":"a "+h;log("Showdown: "+names(lead)+" wins $"+payouts[lead]+" with "+desc+".")}else log("Showdown: "+winners.map(i=>names(i)+" wins $"+payouts[i]).join("; ")+".");handWinnerIds=winners.slice();lastShowdown={totalPot,board:cardsText(board),payouts:winners.map(i=>({player:names(i),amount:payouts[i],cards:cardsText(players[i].cards),hand:handNames[eval7(players[i].cards.concat(board))[0]]})),sidePots:pots};gameSession.clearPot();pot=0;gameSession.assertFinite();finishHand();render()}
+function showdown(){const state=controllerState();const settlement=resolveShowdown(state,eval7,cmp);gameSession.assertFinite();const payouts=settlement.payouts;const pots=settlement.pots.map(p=>({amount:p.amount,winners:p.winners.map(names),hand:handNames[p.rank[0]]}));let totalPot=settlement.totalPot,winners=payouts.map((x,i)=>x>0?i:-1).filter(i=>i>=0),lead=winners.slice().sort((a,b)=>payouts[b]-payouts[a])[0],leadHand=lead!==undefined?handNames[eval7(gameSession.state.players[lead].cards.concat(gameSession.state.board))[0]]:"";if(winners.length===1){let h=leadHand.toLowerCase(),rr=eval7(gameSession.state.players[lead].cards.concat(gameSession.state.board)),rankWord=v=>v===14?"A":v===13?"K":v===12?"Q":v===11?"J":v===10?"T":String(v),desc=h==="high card"?rankWord(rr[1])+" high":h==="pair"?"a pair of "+rankWord(rr[1])+"s with "+rankWord(rr[2])+" kicker":h==="two pair"?"two pair, "+rankWord(rr[1])+"s and "+rankWord(rr[2])+"s, "+rankWord(rr[3])+" kicker":h==="trips"?"three of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="quads"?"four of a kind, "+rankWord(rr[1])+"s, with "+rankWord(rr[2])+" high":h==="straight"?"a straight, "+rankWord(rr[1])+" high":h==="flush"?"a flush, "+rankWord(rr[1])+" high":"a "+h;log("Showdown: "+names(lead)+" wins $"+payouts[lead]+" with "+desc+".")}else log("Showdown: "+winners.map(i=>names(i)+" wins $"+payouts[i]).join("; ")+".");handWinnerIds=winners.slice();lastShowdown={totalPot,board:cardsText(gameSession.state.board),payouts:winners.map(i=>({player:names(i),amount:payouts[i],cards:cardsText(gameSession.state.players[i].cards),hand:handNames[eval7(gameSession.state.players[i].cards.concat(gameSession.state.board))[0]]})),sidePots:pots};gameSession.clearPot();gameSession.state.pot=0;gameSession.assertFinite();finishHand();render()}
 function start(){
  clearTimeout(botTimer);botTimer=null;
  if(chatTurns.length){chatArchive.push({hand:handNo,turns:chatTurns.slice()});chatTurns=[]}
  const cm=$("chatMessages");if(cm)cm.innerHTML='<div class="chatBot">Ask ChatGPT about your hand, your decision, or what the other players might have.</div>';
  handWinnerIds=[];
- let first=players.length!==10;
- let oldStacks=first?Array(10).fill(200):players.map(p=>p.stack);
+ let first=gameSession.state.players.length!==10;
+ let oldStacks=first?Array(10).fill(200):gameSession.state.players.map(p=>p.stack);
  if(!first){
   for(let i=1;i<10;i++){
    if(oldStacks[i]===0&&botRebuys[i]<1){oldStacks[i]=200;botRebuys[i]++;log(names(i)+" buys back in for $200.")}
@@ -460,18 +460,18 @@ function start(){
   if(oldStacks[0]===0){heroBusted=true;showHeroRebuy();return}
  }
  shuffle();
- const hand=createHand(oldStacks,button,deck,BOT_STYLES);
+ const hand=createHand(oldStacks,button:gameSession.state.button,deck:gameSession.state.deck,BOT_STYLES);
  if(!hand){alert("Game over — only one player remains.");return}
  gameSession.begin(hand);
- syncController(gameSession.state);
+ 
  const setup=hand.setup;
  dealSound(2);
  lastShowdown=null;finalHandVerdict=null;finalHandReviewBusy=false;gptVerdictBusy=false;gptRecommendationBusy=false;gptRecommendation=null;gptRecommendationKey="";paused=false;coachVisible=false;snapshot=null;logs=[];heroReviews=[];handNo++;
  $("continue").style.display="none";$("next").style.display="none";$("sizes").classList.remove("show");$("toggleCoach").textContent="Show coach";
  log(names(setup.sb)+" posts SB $"+setup.sbPay+".");log(names(setup.bb)+" posts BB $"+setup.bbPay+".");
- render();if(actor!==0)scheduleDrive(BOT_ACTION_DELAY)
+ render();if(gameSession.state.actor!==0)scheduleDrive(BOT_ACTION_DELAY)
 }
-function showHeroRebuy(){gameSession.finish();ended=true;coachVisible=true;showRebuyUI({$,onRebuy:()=>{players[0].stack=200;heroBusted=false;start()}})}
+function showHeroRebuy(){gameSession.finish();gameSession.state.ended=true;coachVisible=true;showRebuyUI({$,onRebuy:()=>{gameSession.state.players[0].stack=200;heroBusted=false;start()}})}
 
 const CHAT_API="https://holdem-coach-api.lawrence-le.workers.dev/";
 let chatBusy=false,chatTurns=[],chatArchive=[];
@@ -482,14 +482,14 @@ function drawFacts(cards,b){if(!cards||cards.length!==2||!b||b.length<3||b.lengt
 function structuredHandHistory(){
  const streets=["Preflop","Flop","Turn","River"];
  return streets.map((name,idx)=>{
-  const acts=handActions.filter(a=>a.street===idx).map(a=>({
+  const acts=gameSession.state.handActions.filter(a=>a.street===idx).map(a=>({
    player:names(a.i),position:a.position||null,action:a.type,
    amountPutIn:a.amount||0,fromStreetBet:a.fromBet||0,toStreetBet:a.toBet||0,raiseTo:a.target||null,potBefore:a.potBefore,potAfter:a.potAfter
   }));
   let streetBoard=[];
-  if(idx===1)streetBoard=cardsText(board.slice(0,3));
-  if(idx===2)streetBoard=cardsText(board.slice(0,4));
-  if(idx===3)streetBoard=cardsText(board.slice(0,5));
+  if(idx===1)streetBoard=cardsText(gameSession.state.board.slice(0,3));
+  if(idx===2)streetBoard=cardsText(gameSession.state.board.slice(0,4));
+  if(idx===3)streetBoard=cardsText(gameSession.state.board.slice(0,5));
   return {street:name,board:streetBoard,actions:acts};
  });
 }
@@ -500,8 +500,8 @@ function decisionToAnalyze(){
   street:streetName(snapshot.street),
   heroAction:review.action||snapshot.action||null,
   heroPosition:pos(0),
-  heroCards:cardsText(players[0].cards),
-  boardAtDecision:cardsText(snapshot.board||board),
+  heroCards:cardsText(gameSession.state.players[0].cards),
+  boardAtDecision:cardsText(snapshot.board||gameSession.state.board),
   potBeforeDecision:snapshot.pot,
   amountToCall:snapshot.c,
   requiredEquity:snapshot.need,
@@ -511,28 +511,28 @@ function decisionToAnalyze(){
  };
 }
 function chatContext(mode="chat",decisionOverride=null){
- const hero=players[0];
- const showdown=ended||street===4;
- const seats=players.map((p,i)=>({
+ const hero=gameSession.state.players[0];
+ const showdown=gameSession.state.ended||gameSession.state.street===4;
+ const seats=gameSession.state.players.map((p,i)=>({
   seat:names(i),position:pos(i),stack:p.stack,folded:p.folded,allIn:p.allin,personality:p.style||null,
   committedThisStreet:p.streetBet,
   ...(i===0||showdown?{cards:cardsText(p.cards)}:{})
  }));
  return {
   handNumber:handNo,
-  currentStreet:streetName(street),
+  currentStreet:streetName(gameSession.state.street),
   hero:{position:pos(0),cards:cardsText(hero.cards),stack:hero.stack,hand:hero.cards.length?heroHand():""},
-  currentBoard:cardsText(board),
-  authoritativeHeroFacts:deterministicHandFacts(hero.cards,board),
-  authoritativeHeroDrawFacts:drawFacts(hero.cards,board),
-  currentPot:pot,currentBet,amountToCall:callAmt(0),handStrength:currentHandStrength(),startingHandStrength:startingHandStrength(hero.cards),estimatedEquityVsRandomLiveHands:estimateEquity(),
+  currentBoard:cardsText(gameSession.state.board),
+  authoritativeHeroFacts:deterministicHandFacts(hero.cards,gameSession.state.board),
+  authoritativeHeroDrawFacts:drawFacts(hero.cards,gameSession.state.board),
+  currentPot:gameSession.state.pot,currentBet:gameSession.state.currentBet,amountToCall:callAmt(0),handStrength:currentHandStrength(),startingHandStrength:startingHandStrength(hero.cards),estimatedEquityVsRandomLiveHands:estimateEquity(),
   players:seats,
   // Deterministic evaluations of all exposed hands; never ask the language model to rank cards.
-  authoritativeVisibleHandRankings:(showdown?players.filter(p=>!p.folded).map((p,i)=>({player:names(i),cards:cardsText(p.cards),folded:p.folded,hand:p.cards&&p.cards.length===2&&board.length>=3?handNames[eval7(p.cards.concat(board))[0]]:null,rankVector:p.cards&&p.cards.length===2&&board.length>=3?eval7(p.cards.concat(board)):null})).filter(x=>x.hand):[]),
+  authoritativeVisibleHandRankings:(showdown?gameSession.state.players.filter(p=>!p.folded).map((p,i)=>({player:names(i),cards:cardsText(p.cards),folded:p.folded,hand:p.cards&&p.cards.length===2&&gameSession.state.board.length>=3?handNames[eval7(p.cards.concat(gameSession.state.board))[0]]:null,rankVector:p.cards&&p.cards.length===2&&gameSession.state.board.length>=3?eval7(p.cards.concat(gameSession.state.board)):null})).filter(x=>x.hand):[]),
   tagStrategyReference:{
    status:"Provisional educational TAG rules; not solver validated",
    preflopRanges:{openByPosition:openRanges,overlimp:TAG_PF.overlimp,isolationRaise:TAG_PF.isoValue,callFacingRaise:TAG_PF.flatRaise,threeBet:TAG_PF.threeBet,threeBetLate:TAG_PF.threeBetLate},
-   currentPreflopSituation:street===0?{position:pos(0),limpersBeforeHero:handActions.filter(a=>a.street===0&&a.i!==0&&a.type==="call"&&a.betBefore<=2).length,raisesBeforeHero:handActions.filter(a=>a.street===0&&a.i!==0&&a.type==="raise").length}:null,
+   currentPreflopSituation:gameSession.state.street===0?{position:pos(0),limpersBeforeHero:gameSession.state.handActions.filter(a=>a.street===0&&a.i!==0&&a.type==="call"&&a.betBefore<=2).length,raisesBeforeHero:gameSession.state.handActions.filter(a=>a.street===0&&a.i!==0&&a.type==="raise").length}:null,
    exampleOverlimpHands:"22 (smallest pocket pair), A2s (lowest suited ace), 54s (lowest suited connector); these are different hand families, not one globally ranked threshold.",
    notation:"s means suited, o means offsuit, + means that rank or stronger in the same hand family."
   },
@@ -542,8 +542,8 @@ function chatContext(mode="chat",decisionOverride=null){
   heroDecisionReviews:heroReviews.map(r=>({street:streetName(r.street),action:r.action,localVerdict:r.verdict})),
   showdown:showdown?{
    authoritativeResult:lastShowdown,
-   board:cardsText(board),
-   revealedHands:players.filter(p=>!p.folded&&p.cards&&p.cards.length===2).map((p,i)=>({player:names(players.indexOf(p)),cards:cardsText(p.cards),folded:p.folded})),
+   board:cardsText(gameSession.state.board),
+   revealedHands:gameSession.state.players.filter(p=>!p.folded&&p.cards&&p.cards.length===2).map((p,i)=>({player:names(gameSession.state.players.indexOf(p)),cards:cardsText(p.cards),folded:p.folded})),
    note:"Only non-folded players are eligible for showdown pots. Folded players cannot win, and their hole cards are not revealed. Use authoritativeResult.payouts as the source of truth for who won. On the river, there are no future cards left to come."
   }:null,
   chronologicalLog:logs.slice(-80),
@@ -581,29 +581,29 @@ let STRATEGY_MODE="TAG"; // Strategy adapter selected by player.
 
 
 
-const strategyContext={get players(){return players},get handActions(){return handActions},canonHand,pos,inRange,postClass,state:()=>({street,pot,currentBet,minRaise})};
+const strategyContext={get players(){return gameSession.state.players},get handActions(){return gameSession.state.handActions},canonHand,pos,inRange,postClass,state:()=>({street:gameSession.state.street,pot:gameSession.state.pot,currentBet:gameSession.state.currentBet,minRaise:gameSession.state.minRaise})};
 const STRATEGIES={TAG:createTagStrategy(strategyContext)};
 STRATEGIES.LOOSE_TAG=createLooseTagStrategy(strategyContext,STRATEGIES.TAG);
 function strategyRecommendation(d){return STRATEGIES[STRATEGY_MODE].recommend(d)}
 
 function recommendationKey(d){
- return [handNo,street,actor,pot,currentBet,d.c,cardsText(board).join(","),handActions.length].join("|");
+ return [handNo,street:gameSession.state.street,actor:gameSession.state.actor,pot:gameSession.state.pot,currentBet:gameSession.state.currentBet,d.c,cardsText(gameSession.state.board).join(","),gameSession.state.handActions.length].join("|");
 }
 async function requestGPTRecommendation(d,key){
- if(gptRecommendationBusy||ended||paused||actor!==0)return;
+ if(gptRecommendationBusy||gameSession.state.ended||paused||gameSession.state.actor!==0)return;
  gptRecommendationBusy=true;gptRecommendationKey=key;gptRecommendation=null;
  const decision={
-  street:streetName(street),heroPosition:d.p,heroCards:cardsText(players[0].cards),
-  boardAtDecision:cardsText(board),potBeforeDecision:pot,amountToCall:d.c,
-  requiredEquity:d.need,rawEquityVsRandomHands:d.e,handStrength:d.handStrength,startingHandStrength:d.startingStrength,currentBetBeforeAction:currentBet,
-  heroStreetBet:players[0].streetBet,
+  street:streetName(gameSession.state.street),heroPosition:d.p,heroCards:cardsText(gameSession.state.players[0].cards),
+  boardAtDecision:cardsText(gameSession.state.board),potBeforeDecision:gameSession.state.pot,amountToCall:d.c,
+  requiredEquity:d.need,rawEquityVsRandomHands:d.e,handStrength:d.handStrength,startingHandStrength:d.startingStrength,currentBetBeforeAction:gameSession.state.currentBet,
+  heroStreetBet:gameSession.state.players[0].streetBet,
   playersLive:d.live,
-  livePlayers:live().map(i=>({player:names(i),position:pos(i),stackBehind:players[i].stack,committedThisStreet:players[i].streetBet,actionShown:players[i].action||null})),
+  livePlayers:live().map(i=>({player:names(i),position:pos(i),stackBehind:gameSession.state.players[i].stack,committedThisStreet:gameSession.state.players[i].streetBet,actionShown:gameSession.state.players[i].action||null})),
   heroHasNotActedYet:true,
-  priorActionsThisStreet:handActions.filter(a=>a.street===street&&a.i!==0).map(a=>({player:names(a.i),position:a.position||null,action:a.type,amountPutIn:a.amount||0,fromStreetBet:a.fromBet||0,toStreetBet:a.toBet||0,raiseTo:a.target||null,potBefore:a.potBefore,potAfter:a.potAfter})),
-  preflopLimpCount:street===0?handActions.filter(a=>a.street===0&&a.i!==0&&a.type==="call"&&(a.toBet||2)<=2).length:null,
-  authoritativeHandFacts:deterministicHandFacts(players[0].cards,board),
-  authoritativeDrawFacts:drawFacts(players[0].cards,board)
+  priorActionsThisStreet:gameSession.state.handActions.filter(a=>a.street===gameSession.state.street&&a.i!==0).map(a=>({player:names(a.i),position:a.position||null,action:a.type,amountPutIn:a.amount||0,fromStreetBet:a.fromBet||0,toStreetBet:a.toBet||0,raiseTo:a.target||null,potBefore:a.potBefore,potAfter:a.potAfter})),
+  preflopLimpCount:gameSession.state.street===0?gameSession.state.handActions.filter(a=>a.street===0&&a.i!==0&&a.type==="call"&&(a.toBet||2)<=2).length:null,
+  authoritativeHandFacts:deterministicHandFacts(gameSession.state.players[0].cards,gameSession.state.board),
+  authoritativeDrawFacts:drawFacts(gameSession.state.players[0].cards,gameSession.state.board)
  };
  try{
   const response=await fetch(CHAT_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
@@ -620,14 +620,14 @@ async function requestGPTRecommendation(d,key){
   if(gptRecommendationKey===key){gptRecommendation={verdict:rec.toUpperCase(),analysis:reason||"ChatGPT did not supply a reason."}}
  }catch(err){
   if(gptRecommendationKey===key)gptRecommendation={verdict:"COACH UNAVAILABLE",analysis:"ChatGPT couldn't load a recommendation. You can still use the decision math below."};
- }finally{gptRecommendationBusy=false;if(!ended&&!paused&&actor===0)render()}
+ }finally{gptRecommendationBusy=false;if(!gameSession.state.ended&&!paused&&gameSession.state.actor===0)render()}
 }
 
 async function getGPTVerdict(d,type){
  const actionName=type==="raise"?(d.c?"Raise":"Bet"):type==="call"?(d.c?"Call":"Check"):type==="fold"?"Fold":"Check";
  const decision={
   street:streetName(d.street),heroAction:actionName,heroPosition:d.position,
-  heroCards:cardsText(players[0].cards),boardAtDecision:cardsText(d.board),
+  heroCards:cardsText(gameSession.state.players[0].cards),boardAtDecision:cardsText(d.board),
   potBeforeDecision:d.pot,amountToCall:d.c,requiredEquity:d.need,
   rawEquityVsRandomHands:d.e,
   startingHandStrength:d.startingStrength,
@@ -637,10 +637,10 @@ async function getGPTVerdict(d,type){
   raiseOrBetTo:d.actionTarget||null,
   chipsAddedByHero:d.actionTarget?Math.max(0,d.actionTarget-(d.heroStreetBetBefore||0)):null,
   currentBetBeforeAction:d.bet,
-  priorActionsThisStreet:handActions.filter(a=>a.street===d.street&&a.i!==0).map(a=>({player:names(a.i),position:a.position||null,action:a.type,amountPutIn:a.amount||0,fromStreetBet:a.fromBet||0,toStreetBet:a.toBet||0,raiseTo:a.target||null,potBefore:a.potBefore,potAfter:a.potAfter})),
-  preflopLimpCount:d.street===0?handActions.filter(a=>a.street===0&&a.i!==0&&a.type==="call"&&(a.toBet||2)<=2).length:null,
-  authoritativeHandFacts:deterministicHandFacts(players[0].cards,d.board),
-  authoritativeDrawFacts:drawFacts(players[0].cards,d.board),
+  priorActionsThisStreet:gameSession.state.handActions.filter(a=>a.street===d.street&&a.i!==0).map(a=>({player:names(a.i),position:a.position||null,action:a.type,amountPutIn:a.amount||0,fromStreetBet:a.fromBet||0,toStreetBet:a.toBet||0,raiseTo:a.target||null,potBefore:a.potBefore,potAfter:a.potAfter})),
+  preflopLimpCount:d.street===0?gameSession.state.handActions.filter(a=>a.street===0&&a.i!==0&&a.type==="call"&&(a.toBet||2)<=2).length:null,
+  authoritativeHandFacts:deterministicHandFacts(gameSession.state.players[0].cards,d.board),
+  authoritativeDrawFacts:drawFacts(gameSession.state.players[0].cards,d.board),
   warning:"Grade only this decision using information available at this moment. Raw equity is versus random hands. Identify made hands and draws correctly."
  };
  gptVerdictBusy=true;
@@ -684,10 +684,10 @@ async function sendChat(){
   // Keep the current user question at the beginning of the request. The Worker
   // may cap prompt length; long instructions/history previously pushed it out.
   const context=chatContext();
-  context.currentDecisionStatus=ended?"Hand completed":paused?"Paused after a completed action":actor===0?"Hero is currently facing a decision and has NOT acted yet":"Waiting for another player's action";
-  context.heroHasActedThisStreet=handActions.some(a=>a.street===street&&a.i===0);
-  context.authoritativeCurrentRecommendation=(!ended&&!paused&&actor===0)?(()=>{const rec=strategyRecommendation(coachData());return {strategy:STRATEGY_MODE,action:rec.action,raiseTo:rec.target||null,rationale:rec.why,ruleId:rec.ruleId,policy:"This is the in-app recommendation, not necessarily the only defensible poker action."}})():null;
-  context.currentDecisionActions=handActions.filter(a=>a.street===street).map(a=>({player:names(a.i),action:a.type,amount:a.amount||0}));
+  context.currentDecisionStatus=gameSession.state.ended?"Hand completed":paused?"Paused after a completed action":gameSession.state.actor===0?"Hero is currently facing a decision and has NOT acted yet":"Waiting for another player's action";
+  context.heroHasActedThisStreet=gameSession.state.handActions.some(a=>a.street===gameSession.state.street&&a.i===0);
+  context.authoritativeCurrentRecommendation=(!gameSession.state.ended&&!paused&&gameSession.state.actor===0)?(()=>{const rec=strategyRecommendation(coachData());return {strategy:STRATEGY_MODE,action:rec.action,raiseTo:rec.target||null,rationale:rec.why,ruleId:rec.ruleId,policy:"This is the in-app recommendation, not necessarily the only defensible poker action."}})():null;
+  context.currentDecisionActions=gameSession.state.handActions.filter(a=>a.street===gameSession.state.street).map(a=>({player:names(a.i),action:a.type,amount:a.amount||0}));
   context.chatHistory=chatTurns.slice(-4).map(x=>({role:x.role,text:x.text.slice(0,350)}));
   context.chatInstructions=[
    "Answer the user's latest question first, directly and accurately.",
@@ -715,7 +715,7 @@ async function sendChat(){
   $("chatMessages").scrollTop=$("chatMessages").scrollHeight;
  }
 }
-bindGameControls({$,document,getState:()=>({players,pot,currentBet,minRaise,coachVisible,gptVerdictBusy}),setState:patch=>{if("coachVisible" in patch)coachVisible=patch.coachVisible;if("paused" in patch)paused=patch.paused},unlockAudio,start,heroAction,callAmt,potFractionRaiseTarget,skipToEnd,afterHero,render,sendChat,onStrategyChange:value=>{STRATEGY_MODE=value;if(!ended&&!paused)renderCoach();if($("chartOverlay").classList.contains("open"))renderPreflopChart()}});
+bindGameControls({$,document,getState:()=>({players:gameSession.state.players,pot:gameSession.state.pot,currentBet:gameSession.state.currentBet,minRaise:gameSession.state.minRaise,coachVisible,gptVerdictBusy}),setState:patch=>{if("coachVisible" in patch)coachVisible=patch.coachVisible;if("paused" in patch)paused=patch.paused},unlockAudio,start,heroAction,callAmt,potFractionRaiseTarget,skipToEnd,afterHero,render,sendChat,onStrategyChange:value=>{STRATEGY_MODE=value;if(!gameSession.state.ended&&!paused)renderCoach();if($("chartOverlay").classList.contains("open"))renderPreflopChart()}});
 })();
 </script>
 </body>

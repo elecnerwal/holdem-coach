@@ -130,10 +130,12 @@ export function legalActions(state,i){
  return {fold:true,check:toCall===0,call:toCall>0&&p.stack>0,raise:maxRaiseTo>state.currentBet,minRaiseTo:maxRaiseTo>state.currentBet?minRaiseTo:null,maxRaiseTo,toCall};
 }
 
-/** Raise TO a fraction of the displayed pot, subject to table limits. */
+/** Conventional pot-sized raise: first call, then raise by a fraction of the pot after calling. */
 export function potFractionRaiseTarget({pot,currentBet,minRaise,streetBet,stack},fraction){
  if(!Number.isFinite(fraction)||fraction<=0)throw Error("Invalid pot fraction");
+ const toCall=Math.max(0,currentBet-streetBet);
  const max=streetBet+stack;
  const minimum=currentBet?currentBet+minRaise:Math.max(2,minRaise);
- return Math.min(max,Math.max(Math.min(max,minimum),Math.round(pot*fraction)));
+ const raiseTo=currentBet+Math.round((pot+toCall)*fraction);
+ return Math.min(max,Math.max(Math.min(max,minimum),raiseTo));
 }

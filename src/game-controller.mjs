@@ -9,7 +9,7 @@ export function createHand(stacks,previousButton,deck,styles=[]){
   players:setup.players,button:rotation.button,deck,board:[],street:0,
   pot:setup.pot,currentBet:setup.currentBet,minRaise:2,actor:setup.actor,
   acted:new Set(),raiseLocked:new Set(),streetActions:[],handActions:[],
-  handStartStacks:setup.players.map(p=>p.stack),ended:false,setup
+  handStartStacks:stacks.slice(),ended:false,setup
  };
 }
 export function act(state,seat,type,target=0,position=''){

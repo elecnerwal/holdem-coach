@@ -12,22 +12,6 @@ export function createHand(stacks,previousButton,deck,styles=[]){
   handStartStacks:setup.players.map(p=>p.stack),ended:false,setup
  };
 }
-export function takeAction(state,seat,type,target=0,position=''){
- const p=state.players[seat];
- if(!p)throw Error('Invalid player');
- const toCall=Math.max(0,state.currentBet-p.streetBet);
- if(type==='raise'){
-  const rights=legalActions(state,seat);
-  const max=p.streetBet+p.stack;
-  const minimum=state.currentBet?state.currentBet+state.minRaise:Math.max(2,state.minRaise);
-  if(!rights.raise||max<=state.currentBet)type=toCall?'call':'check';
-  else target=Math.min(max,Math.max(target,Math.min(max,minimum)));
- }
- const result=applyBettingAction({...state,position},seat,type,target);
- // applyBettingAction can replace sets rather than mutate them.
- // A single shared transition object ensures the caller receives those changes.
- return {type,...result};
-}
 export function act(state,seat,type,target=0,position=''){
  const p=state.players[seat];
  if(!p)throw Error('Invalid player');

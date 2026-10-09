@@ -140,3 +140,34 @@ test('deck module: deterministic shuffle using injected RNG',async()=>{
  const b=createShuffledDeck('23456789TJQKA',['♠','♥','♦','♣'],()=>0.5);
  assert.deepEqual(a,b);
 });
+
+test('hand setup: ten-handed blinds, cards, and UTG action',async()=>{
+ const {nextDealer,initializeHand}=await import('../src/hand-setup.mjs');
+ const stacks=Array(10).fill(200);
+ const rotation=nextDealer(stacks,-1);
+ assert.equal(rotation.button,0);
+ const deck=Array.from({length:52},(_,i)=>({r:String(i),s:'x'}));
+ const result=initializeHand(stacks,rotation.button,deck);
+ assert.equal(result.sb,1);assert.equal(result.bb,2);assert.equal(result.actor,3);
+ assert.equal(result.pot,3);assert.equal(result.currentBet,2);
+ assert.equal(result.players[1].stack,199);assert.equal(result.players[2].stack,198);
+ assert.equal(result.players[0].cards.length,2);assert.equal(deck.length,32);
+});
+test('hand setup: heads-up button posts small blind and acts first',async()=>{
+ const {nextDealer,initializeHand}=await import('../src/hand-setup.mjs');
+ const stacks=[200,0,0,200,0,0,0,0,0,0];
+ const {button}=nextDealer(stacks,-1);
+ const deck=Array.from({length:52},(_,i)=>({r:String(i),s:'x'}));
+ const result=initializeHand(stacks,button,deck);
+ assert.equal(result.sb,0);assert.equal(result.bb,3);assert.equal(result.actor,0);
+ assert.equal(result.players[1].cards.length,0);assert.equal(result.pot,3);
+});
+test('hand setup: short stack blind is capped and marked all-in',async()=>{
+ const {initializeHand}=await import('../src/hand-setup.mjs');
+ const stacks=[200,1,1,200];
+ const deck=Array.from({length:52},(_,i)=>({r:String(i),s:'x'}));
+ const result=initializeHand(stacks,0,deck);
+ assert.equal(result.pot,2);assert.equal(result.currentBet,1);
+ assert.equal(result.players[1].allin,true);assert.equal(result.players[2].allin,true);
+ assert.equal(result.actor,3);
+});

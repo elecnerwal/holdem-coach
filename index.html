@@ -471,7 +471,7 @@ function start(){
  log(names(setup.sb)+" posts SB $"+setup.sbPay+".");log(names(setup.bb)+" posts BB $"+setup.bbPay+".");
  render();if(gameSession.state.actor!==0)scheduleDrive(BOT_ACTION_DELAY)
 }
-function showHeroRebuy(){gameSession.finish();gameSession.state.ended=true;coachVisible=true;showRebuyUI({$,onRebuy:()=>{gameSession.state.players[0].stack=200;heroBusted=false;start()}})}
+function showHeroRebuy(){gameSession.finish();gameSession.state.ended=true;coachVisible=true;showRebuyUI({$,onRebuy:()=>{gameSession.rebuy(0,200);heroBusted=false;start()}})}
 
 const CHAT_API="https://holdem-coach-api.lawrence-le.workers.dev/";
 let chatBusy=false,chatTurns=[],chatArchive=[];

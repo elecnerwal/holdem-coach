@@ -1,6 +1,7 @@
-// Pure game-engine primitives: seats, turn order and showdown side-pot accounting.\nexport function seatPositions(seats,dealer){
+// Pure game-engine primitives: seats, turn order and showdown side-pot accounting.
+export function seatPositions(seats,dealer){
 function activeSeatIds(){return seats.map((p,i)=>p&&p.stack>0?i:-1).filter(i=>i>=0)}
-function clockwiseActive(from){let a=[];for(let n=1;n<=10;n++){let j=(from+n)%10;if(seats[j]&&seats[j].stack>0)a.push(j)}return a}
+function clockwiseActive(from){let a=[];for(let n=1;n<=seats.length;n++){let j=(from+n)%seats.length;if(seats[j]&&seats[j].stack>0)a.push(j)}return a}
 function pos(i){
  let active=activeSeatIds();if(!active.includes(i))return "OUT";
  let order=[dealer,...clockwiseActive(dealer)];

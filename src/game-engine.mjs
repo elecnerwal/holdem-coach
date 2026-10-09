@@ -53,3 +53,12 @@ export function nextActionableSeat(players,from){
  for(let n=1;n<=players.length;n++){const i=(from+n)%players.length;if(!players[i].folded&&!players[i].allin)return i}
  return -1;
 }
+
+/** Apply an already calculated call to the player's state. Returns its chip payment. */
+export function applyCall(player,wager){
+ player.stack-=wager.pay;
+ player.streetBet=wager.toBet;
+ player.action="Call "+wager.pay;
+ if(player.stack===0)player.allin=true;
+ return wager.pay;
+}

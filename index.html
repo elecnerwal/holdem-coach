@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hold'em Coach v81</title>
+<title>Hold'em Coach v82</title>
 <style>
 :root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--text:#e6edf3;--muted:#8b949e;--border:#30363d;--accent:#2f81f7;--good:#3fb950;--bad:#f85149;--felt:#153f2d}
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -85,7 +85,7 @@ button:hover{border-color:#6e7681}button:disabled{opacity:.35;cursor:not-allowed
 <body>
 <div class="wrap">
  <div class="top">
-  <div><strong>Hold'em Coach v81</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
+  <div><strong>Hold'em Coach v82</strong><div class="muted">$1/$2 · 10-handed · $200 buy-in · one bot rebuy</div></div>
   <div><label style="font-size:12px;color:#aeb9c8;margin-right:6px">Strategy <select id="strategyMode" style="background:#202b38;color:white;border:1px solid #526073;border-radius:7px;padding:8px"><option value="TAG">TAG</option><option value="LOOSE_TAG">Loose TAG</option><option value="GTO" disabled>GTO (coming later)</option></select></label> <button id="toggleCoach">Show coach</button> <button id="openCharts" type="button">Preflop charts</button> <button id="newHand" style="display:none">New hand</button></div>
  </div>
  <div class="grid">
@@ -152,7 +152,7 @@ import {createTagStrategy,openRanges,TAG_PF} from "./src/strategies/tag.mjs";
 import {createLooseTagStrategy,LOOSE_OPEN,LOOSE_ISO,LOOSE_OVERLIMP} from "./src/strategies/loose-tag.mjs";
 (()=>{
 const $=id=>document.getElementById(id), ranks="23456789TJQKA".split(""), suits=["♠","♥","♦","♣"];
-let deck=[], players=[], board=[], button=-1, street=0, pot=0, currentBet=0, minRaise=2, actor=0, acted=new Set(), paused=false, ended=false, coachVisible=false, logs=[], snapshot=null, handNo=0, handStartStacks=[], handHistory=[], heroReviews=[], botRebuys=Array(10).fill(0), heroBusted=false, streetActions=[], handActions=[], botTimer=null, lastShowdown=null, handWinnerIds=[], gptVerdictBusy=false;
+let deck=[], players=[], board=[], button=-1, street=0, pot=0, currentBet=0, minRaise=2, actor=0, acted=new Set(), raiseLocked=new Set(), paused=false, ended=false, coachVisible=false, logs=[], snapshot=null, handNo=0, handStartStacks=[], handHistory=[], heroReviews=[], botRebuys=Array(10).fill(0), heroBusted=false, streetActions=[], handActions=[], botTimer=null, lastShowdown=null, handWinnerIds=[], gptVerdictBusy=false;
 const BOT_STYLES=[null,"TAG","Calling Station","Nit","LAG","Beginner","TAG","Strong Reg","Calling Station","Nit"];
 const BOT_ACTION_DELAY=850, STREET_DELAY=1150;
 let gptRecommendationBusy=false,gptRecommendationKey="",gptRecommendation=null;
@@ -425,12 +425,12 @@ function commit(i,type,target=0){
  if(type==="raise"){
   const max=p.streetBet+p.stack;
   const minimum=currentBet?currentBet+minRaise:Math.max(2,minRaise);
-  if(max<=currentBet){type=c?"call":"check"}
+  if(raiseLocked.has(i)||max<=currentBet){type=c?"call":"check"}
   else target=Math.min(max,Math.max(target,Math.min(max,minimum)));
  }
- const state={players,board,street,pot,currentBet,minRaise,acted,streetActions,handActions,position:pos(i)};
+ const state={players,board,street,pot,currentBet,minRaise,acted,raiseLocked,streetActions,handActions,position:pos(i)};
  const result=applyBettingAction(state,i,type,target);
- pot=state.pot;currentBet=state.currentBet;minRaise=state.minRaise;acted=state.acted;
+ pot=state.pot;currentBet=state.currentBet;minRaise=state.minRaise;acted=state.acted;raiseLocked=state.raiseLocked;
  if(type==="fold")foldSound();
  else if(type==="call"||type==="raise"){if(result.allin)allInSound();else chipSound()}
  log(names(i)+" "+result.actionText+".");
@@ -451,7 +451,7 @@ function winnerMadeHand(i){
 }
 function awardSingle(){const state={players,pot,ended};const result=settleUncontested(state);if(!result)return false;handWinnerIds=[result.winner];pot=state.pot;ended=state.ended;log(`${names(result.winner)} wins ${result.amount} — everyone else folded.`);finishHand();return true}
 function firstPost(){for(let n=1;n<=10;n++){let j=(button+n)%10;if(!players[j].folded&&!players[j].allin)return j}return -1}
-function nextStreet(){if(street===3){showdown();return}const next=advanceStreet({street,players,board,deck,button});street=next.street;board=next.board;currentBet=next.currentBet;minRaise=next.minRaise;actor=next.actor;dealSound(next.dealCount);acted=new Set();streetActions=[];log(next.label)}
+function nextStreet(){if(street===3){showdown();return}const next=advanceStreet({street,players,board,deck,button});street=next.street;board=next.board;currentBet=next.currentBet;minRaise=next.minRaise;actor=next.actor;dealSound(next.dealCount);acted=new Set();raiseLocked=new Set();streetActions=[];log(next.label)}
 function aiDecision(i){let p=players[i],c=callAmt(i),r=Math.random(),style=STYLE[BOT_STYLES[i]]||STYLE.TAG;if(street===0){let a=rv(p.cards[0].r),b=rv(p.cards[1].r),pair=a===b,hi=Math.max(a,b),lo=Math.min(a,b),suited=p.cards[0].s===p.cards[1].s,score=hi+(pair?8:0)+(suited?2:0)+(lo>=10?2:0)+style.loose,pressure=currentBet>=6?2:currentBet>2?1:0;if(c){if(score<11+pressure*2&&r<.82-style.sticky)return["fold",0];if(c>Math.max(12,pot*.55)&&score<17&&r<.80-style.sticky)return["fold",0];if(score>=20&&r<.28+style.aggr)return["raise",Math.min(p.streetBet+p.stack,currentBet+Math.max(minRaise,Math.round(pot*.65)))];return["call",0]}if(score>=15&&r<.48+style.aggr)return["raise",Math.min(p.streetBet+p.stack,Math.max(4,Math.round(pot*.65)))];return["check",0]}let rank=eval7(p.cards.concat(board))[0]||0,frac=c/Math.max(1,pot),multi=live().length;if(c){let f=rank===0?.82:rank===1?(frac>=.75?.78:frac>=.4?.58:.35)+(multi>=4?.12:0):rank===2?(frac>=.9?.45:.18)+(multi>=5?.10:0):.04;f=Math.max(.02,Math.min(.95,f-style.sticky));if(r<f)return["fold",0];if(rank>=3&&r<.30+style.aggr)return["raise",Math.min(p.streetBet+p.stack,currentBet+Math.max(minRaise,Math.round(pot*.55)))];return["call",0]}if(rank>=3&&r<.58+style.aggr)return["raise",Math.min(p.streetBet+p.stack,Math.max(2,Math.round(pot*.6)))];if(rank>=1&&r<.25+style.aggr)return["raise",Math.min(p.streetBet+p.stack,Math.max(2,Math.round(pot*.45)))];return["check",0]}
 function runoutIfNoActions(){
  if(ended)return true;
@@ -459,7 +459,7 @@ function runoutIfNoActions(){
    while(street<3){
      const next=advanceStreet({street,players,board,deck,button});
      street=next.street;board=next.board;currentBet=next.currentBet;minRaise=next.minRaise;actor=next.actor;
-     dealSound(next.dealCount);acted=new Set();streetActions=[];log(next.label);
+     dealSound(next.dealCount);acted=new Set();raiseLocked=new Set();streetActions=[];log(next.label);
    }
    showdown();
    return true;
@@ -635,7 +635,7 @@ function start(){
  const setup=initializeHand(oldStacks,button,deck,BOT_STYLES);
  players=setup.players;
  dealSound(2);
- board=[];street=0;pot=0;currentBet=0;lastShowdown=null;finalHandVerdict=null;finalHandReviewBusy=false;gptVerdictBusy=false;gptRecommendationBusy=false;gptRecommendation=null;gptRecommendationKey="";minRaise=2;acted=new Set();streetActions=[];handActions=[];paused=false;ended=false;coachVisible=false;snapshot=null;logs=[];heroReviews=[];handNo++;handStartStacks=players.map(p=>p.stack);
+ board=[];street=0;pot=0;currentBet=0;lastShowdown=null;finalHandVerdict=null;finalHandReviewBusy=false;gptVerdictBusy=false;gptRecommendationBusy=false;gptRecommendation=null;gptRecommendationKey="";minRaise=2;acted=new Set();raiseLocked=new Set();raiseLocked=new Set();streetActions=[];handActions=[];paused=false;ended=false;coachVisible=false;snapshot=null;logs=[];heroReviews=[];handNo++;handStartStacks=players.map(p=>p.stack);
  $("continue").style.display="none";$("next").style.display="none";$("sizes").classList.remove("show");$("toggleCoach").textContent="Show coach";
  pot=setup.pot;currentBet=setup.currentBet;
  log(names(setup.sb)+" posts SB $"+setup.sbPay+".");log(names(setup.bb)+" posts BB $"+setup.bbPay+".");
